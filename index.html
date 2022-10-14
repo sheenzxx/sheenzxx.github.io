@@ -214,7 +214,7 @@
               <span class="post-meta-item-text">发表于</span>
               
 
-              <time title="创建时间：2022-10-14 15:37:14 / 修改时间：16:52:51" itemprop="dateCreated datePublished" datetime="2022-10-14T15:37:14+08:00">2022-10-14</time>
+              <time title="创建时间：2022-10-14 15:37:14 / 修改时间：17:53:36" itemprop="dateCreated datePublished" datetime="2022-10-14T15:37:14+08:00">2022-10-14</time>
             </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -237,7 +237,7 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <h3 id="安装简介"><a href="#安装简介" class="headerlink" title="安装简介"></a>安装简介</h3><p>安装postgresql(已有跳过)—-&gt;安装postgis所需要的依赖—-&gt;安装postgis—-&gt;进入postgresql数据库—-&gt;指定数据库添加扩展<br>postgresql是基础软件，因此是必须第一个安装的，而postgis的依赖可分为两个部分，一部分是geos库+gdal库+proj库+json-c库+libXML2库，这五个库如果正确安装了，<br>那么就已经可以编译安装postgis并在pg数据库激活或者说新增插件了，但是需要说明的是，此时的postgis并不支持3d数据的分析，存储，计算等工作，仅仅支持2d的地理信息。<br>如果需要支持3d 则需要再安装四个库，这四个库分别是protobuf+protobuf-c+cgal+sfcgal，这四个库均依赖于boost 库,在选择版本上要以boost 库版本为基准。下面来开始<br>安装，以全新的环境未安装postgresql 数据库做示例,所有软件包均放在 /data 目录下</p>
+          <h3 id="安装简介"><a href="#安装简介" class="headerlink" title="安装简介"></a>安装简介</h3><p>安装postgresql(已有跳过)—-&gt;安装postgis所需要的依赖—-&gt;安装postgis—-&gt;进入postgresql数据库—-&gt;指定数据库添加扩展<br>postgresql是基础软件，因此是必须第一个安装的，而postgis的依赖可分为两个部分，一部分是必须的库，包含 geos库，gdal库，<br>proj库，json-c库，libXML2库，这五个库如果正确安装了，那么就已经可以编译安装postgis并在pg数据中创建扩展了，但是需要<br>说明的是，此时的postgis并不支持3d数据的分析，存储，计算等工作，仅仅支持2d的地理信息。如果需要支持3d 则需要再安装四个<br>库，这四个库分别是protobuf，protobuf-c，cgal，sfcgal，这四个库均依赖于boost 库,在选择版本上要以boost 库版本为基准。<br>下面来开始安装，以全新的环境未安装postgresql 数据库做示例,所有软件包均放在 /data 目录下</p>
 <h3 id="本文安装环境"><a href="#本文安装环境" class="headerlink" title="本文安装环境"></a>本文安装环境</h3><p>centos 7 3.10.0-1160.71.1.el7.x86_64</p>
 <h3 id="postgis-安装的前置要求"><a href="#postgis-安装的前置要求" class="headerlink" title="postgis 安装的前置要求:"></a>postgis 安装的前置要求:</h3><ol>
 <li>PostgreSQL 9.6 - 15</li>
