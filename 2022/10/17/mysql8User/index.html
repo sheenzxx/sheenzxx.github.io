@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"sheenzxx.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"gitalk","storage":true,"lazyload":false,"nav":null,"activeClass":"gitalk"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="新特性用户表mysql.useruser.host char(255)# 5版本为60,新版本为255,并且字符类型为ascii --&gt;  CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL DEFAULT &#39;&#39; user.user char(32) # 5版本为16位 .8 版本增加至 32 位 mysql 8.0 新">
+<meta property="og:type" content="article">
+<meta property="og:title" content="mysql 8.0 用户权限部分">
+<meta property="og:url" content="https://sheenzxx.github.io/2022/10/17/mysql8User/index.html">
+<meta property="og:site_name" content="sheen&#39;s Blog">
+<meta property="og:description" content="新特性用户表mysql.useruser.host char(255)# 5版本为60,新版本为255,并且字符类型为ascii --&gt;  CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL DEFAULT &#39;&#39; user.user char(32) # 5版本为16位 .8 版本增加至 32 位 mysql 8.0 新">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2022-10-17T03:15:43.000Z">
+<meta property="article:modified_time" content="2022-10-17T03:35:25.029Z">
+<meta property="article:author" content="Sheen">
+<meta property="article:tag" content="database">
+<meta property="article:tag" content="mysql 8">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://sheenzxx.github.io/2022/10/17/mysql8User/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>mysql 8.0 用户权限部分 | sheen's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="sheen's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">sheen's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">随笔，技术笔记</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/home/" rel="section"><i class="home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://sheenzxx.github.io/2022/10/17/mysql8User/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Sheen">
+      <meta itemprop="description" content="数据库相关技术研究,自动化运维">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="sheen's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          mysql 8.0 用户权限部分
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-10-17 11:15:43 / 修改时间：11:35:25" itemprop="dateCreated datePublished" datetime="2022-10-17T11:15:43+08:00">2022-10-17</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/mysql/" itemprop="url" rel="index"><span itemprop="name">mysql</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h3 id="新特性"><a href="#新特性" class="headerlink" title="新特性"></a>新特性</h3><h4 id="用户表mysql-user"><a href="#用户表mysql-user" class="headerlink" title="用户表mysql.user"></a>用户表mysql.user</h4><pre><code>user.host char(255)# 5版本为60,新版本为255,并且字符类型为ascii --&gt;  CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL DEFAULT &#39;&#39;
+user.user char(32) # 5版本为16位 .8 版本增加至 32 位
+</code></pre><p>mysql 8.0 新增了 role （角色），角色用于管理用户权限;</p>
+<h4 id="创建新角色"><a href="#创建新角色" class="headerlink" title="创建新角色"></a>创建新角色</h4><pre><code>create role role_name;
+create role &#39;app_read&#39;,&#39;app_write&#39;,&#39;dba&#39;;
+</code></pre><h4 id="为角色授权："><a href="#为角色授权：" class="headerlink" title="为角色授权："></a>为角色授权：</h4><pre><code>grant select on db.* to &#39;app_read&#39;@&#39;%&#39;;
+grant insert,delete,update on db.* to &#39;app_write&#39;@&#39;%&#39;
+grant all on *.* to &#39;dba&#39;@&#39;%&#39;;
+</code></pre><h4 id="为用户授权角色"><a href="#为用户授权角色" class="headerlink" title="为用户授权角色"></a>为用户授权角色</h4><pre><code>grant role,role1,role2 to &#39;user&#39;@&#39;%&#39;;
+grant dba to &#39;sheen&#39;@&#39;%&#39;;
+</code></pre><h4 id="为用户设置已授权的角色"><a href="#为用户设置已授权的角色" class="headerlink" title="为用户设置已授权的角色"></a>为用户设置已授权的角色</h4><pre><code>set default role dba to &#39;nagios&#39;@&#39;%&#39;;#为用户设置默认角色 （定义用户时没有使用default role 则可以通过下面命令修改）
+SET DEFAULT ROLE ALL TO USERNAME[,USERNAME2,USERNAME3...]; #将所有权限都授权给用户当默认角色
+SET ROLE NONE;#清除当前会话使用的角色
+SET ROLE ALL EXCEPT &#39;app_write&#39; TO USERNAME;授权用户除了 &#39;app_write&#39; 角色外的所有角色
+SET ROLE DEFAULT; #设置会话使用默认角色
+</code></pre><h4 id="回收授权给用户的角色"><a href="#回收授权给用户的角色" class="headerlink" title="回收授权给用户的角色"></a>回收授权给用户的角色</h4><pre><code>REOVKE ROLE FROM USER;
+eg:
+  revoke &#39;app_read&#39; from sheen;
+回收角色的授权
+REVOKE INSERT, UPDATE, DELETE ON app_db.* FROM &#39;app_write&#39;;
+删除角色
+DROP ROLE &#39;app_read&#39;, &#39;app_write&#39;;
+</code></pre><h3 id="grant-权限-on-db-to-role-name"><a href="#grant-权限-on-db-to-role-name" class="headerlink" title="grant 权限 on db.* to role_name;"></a>grant 权限 on db.* to role_name;</h3><p>eg: create role dba;<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; grant all on *.* to <span class="string">&#x27;dba&#x27;</span>;</span><br><span class="line"><span class="comment">#授权只读角色</span></span><br><span class="line">mysql&gt; create role select_role;</span><br><span class="line">mysql&gt; grant select on db.* to <span class="string">&#x27;select_role&#x27;</span>@<span class="string">&#x27;host_name&#x27;</span>; <span class="comment">#默认授权给&#x27;%&#x27; grant select on db.* to &#x27;select_role&#x27; == grant select on db.* to &#x27;select_role&#x27;@&#x27;%&#x27;;</span></span><br><span class="line"><span class="comment">#授权修改角色</span></span><br><span class="line">mysql&gt; create role update_role;</span><br><span class="line">mysql&gt; grant insert,update,delete to <span class="string">&#x27;update_role&#x27;</span>@<span class="string">&#x27;%&#x27;</span>;</span><br></pre></td></tr></table></figure></p>
+<h3 id="新建用户跟-5-版本有区别"><a href="#新建用户跟-5-版本有区别" class="headerlink" title="新建用户跟 5 版本有区别:"></a>新建用户跟 5 版本有区别:</h3><pre><code>下面这种语法不再支持
+grant 权限 on db.* to &#39;user&#39;@&#39;%&#39; identified by &#39;password&#39;; 
+创建用户
+create user username identified by &#39;password&#39; [default role &#39;xxx&#39;];
+如果没有指定默认角色。当前用户默认角色为NONE,则不具有任何权限。即使你授权了某个role 。
+</code></pre><p>使用角色的授权方法<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; create role dba;</span><br><span class="line">mysql&gt; grant all on *.* to <span class="string">&#x27;dba&#x27;</span>@<span class="string">&#x27;%&#x27;</span>;</span><br><span class="line">mysql&gt; create user abc identified by <span class="string">&#x27;sdxdsq23L&#x27;</span> defualt role dba;</span><br><span class="line">mysql&gt; -- [ 以上语句等价 5 版本时 grant all on *.* to <span class="string">&#x27;abc&#x27;</span>@<span class="string">&#x27;%&#x27;</span> identified by <span class="string">&#x27;sdxdsq23L&#x27;</span>;]</span><br><span class="line">mysql&gt; -- 使用用户授权的方法</span><br><span class="line">mysql&gt; create user abc identified by <span class="string">&#x27;sdxdsq23L&#x27;</span>;</span><br><span class="line">mysql&gt; grant all on *.* to to <span class="string">&#x27;abc&#x27;</span>@<span class="string">&#x27;%&#x27;</span> </span><br></pre></td></tr></table></figure></p>
+<p> 假如我们没有设定defualt role 。将会发生什么情况<br> <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"> mysql&gt; create user <span class="string">&#x27;abc&#x27;</span>@<span class="string">&#x27;%&#x27;</span> identified by <span class="string">&#x27;sdxdsq23L&#x27;</span>;</span><br><span class="line"> grant dba to <span class="string">&#x27;abc&#x27;</span>@<span class="string">&#x27;%&#x27;</span>;</span><br><span class="line"> mysql&gt; show grants <span class="keyword">for</span> abc;</span><br><span class="line">+------------------------------------+</span><br><span class="line">| Grants <span class="keyword">for</span> sheen@%                 |</span><br><span class="line">+------------------------------------+</span><br><span class="line">| GRANT USAGE ON *.* TO `abc`@`%` |</span><br><span class="line">| GRANT `dba`@`%` TO `abc`@`%`    |</span><br><span class="line">+------------------------------------+</span><br><span class="line">mysql&gt; show grants <span class="keyword">for</span> <span class="string">&#x27;dba&#x27;</span>@<span class="string">&#x27;%&#x27;</span>;</span><br><span class="line">+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+</span><br><span class="line">| Grants <span class="keyword">for</span> dba@%                                                                                                                                                                                                                                                                                                                                                                                                                                                    |</span><br><span class="line">+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+</span><br><span class="line">| GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, SHUTDOWN, PROCESS, FILE, REFERENCES, INDEX, ALTER, SHOW DATABASES, SUPER, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EVENT, TRIGGER, CREATE TABLESPACE, CREATE ROLE, DROP ROLE ON *.* TO `dba`@`%`                                                                                       |</span><br><span class="line">| GRANT APPLICATION_PASSWORD_ADMIN,AUDIT_ADMIN,BACKUP_ADMIN,BINLOG_ADMIN,BINLOG_ENCRYPTION_ADMIN,CLONE_ADMIN,CONNECTION_ADMIN,ENCRYPTION_KEY_ADMIN,GROUP_REPLICATION_ADMIN,INNODB_REDO_LOG_ARCHIVE,PERSIST_RO_VARIABLES_ADMIN,REPLICATION_SLAVE_ADMIN,RESOURCE_GROUP_ADMIN,RESOURCE_GROUP_USER,ROLE_ADMIN,SERVICE_CONNECTION_ADMIN,SESSION_VARIABLES_ADMIN,SET_USER_ID,SYSTEM_USER,SYSTEM_VARIABLES_ADMIN,TABLE_ENCRYPTION_ADMIN,XA_RECOVER_ADMIN ON *.* TO `dba`@`%` |</span><br><span class="line">+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+</span><br><span class="line"></span><br><span class="line">mysql&gt; use sheen</span><br><span class="line">ERROR 1044 (42000): Access denied <span class="keyword">for</span> user <span class="string">&#x27;abc&#x27;</span>@<span class="string">&#x27;%&#x27;</span> to database <span class="string">&#x27;sheen&#x27;</span></span><br></pre></td></tr></table></figure><br>由上面可以看出我们已经授权dba 角色。dba 角色具有访问所有库的权限。但是还是连不了 sheen 这个库。<br>继续往下看<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select current_role(); <span class="comment">#查看当前会话使用的角色</span></span><br><span class="line">+----------------+</span><br><span class="line">| current_role() |</span><br><span class="line">+----------------+</span><br><span class="line">| NONE           |</span><br><span class="line">+----------------+</span><br><span class="line">1 row <span class="keyword">in</span> <span class="built_in">set</span> (0.00 sec)</span><br></pre></td></tr></table></figure><br>是因为当前用户连接没有使用任何角色的原因</p>
+<p>为当前会话设置使用角色（所设角色名必须是有授权给当前连接用户的角色）<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; <span class="built_in">set</span> role dba;</span><br><span class="line">mysql&gt; select current_role(); </span><br><span class="line">+----------------+</span><br><span class="line">| current_role() |</span><br><span class="line">+----------------+</span><br><span class="line">| `dba`@`%`      |</span><br><span class="line">+----------------+</span><br><span class="line">mysql&gt; use sheen;</span><br><span class="line">Database changed</span><br></pre></td></tr></table></figure></p>
+<h4 id="新参数-mandatory-roles-强制定义角色参数。使用该参数，则实例下所有用户都会被授权-mandatory-roles-指定角色。而不需要再重新授权"><a href="#新参数-mandatory-roles-强制定义角色参数。使用该参数，则实例下所有用户都会被授权-mandatory-roles-指定角色。而不需要再重新授权" class="headerlink" title="新参数 mandatory_roles 强制定义角色参数。使用该参数，则实例下所有用户都会被授权 mandatory_roles 指定角色。而不需要再重新授权"></a>新参数 mandatory_roles 强制定义角色参数。使用该参数，则实例下所有用户都会被授权 mandatory_roles 指定角色。而不需要再重新授权</h4><pre><code>可用于my.cnf [mysqld] 下面。
+[mysqld]
+ mandatory_roles=&#39;role1,role2@localhost,r3@%.example.com&#39;
+也可以在数据库启动后。动态持久化定义
+SET PERSIST mandatory_roles = &#39;role1,role2@localhost,r3@%.example.com&#39;;
+使用GLOBAL 时 该参数只适合当前实例。重启不保存设置结果
+SET GLOBAL mandatory_roles = &#39;role1,role2@localhost,r3@%.example.com&#39;;
+
+可以将某个授权用户转授权给新用户
+grant select ,update ,delete ,insert on db.* to &#39;u1&#39;;
+grant u1 to u2;
+(这个操作适用于新老用户替换的情况。比如老的维护人员离开。新的维护人员到来。要让新用户人员具有老用户的权限时。可以有以下2种操作方式
+  第一种.改老用户的密码。然后将老用户给新用户用  
+      ALTER USER &#39;old_app_dev&#39;@&#39;localhost&#39; IDENTIFIED BY &#39;new_password&#39;;
+  第二种.将老账户视为角色，锁定老用户，将老用户作为一个角色授权给新的需要的新账户
+      ALTER USER &#39;old_app_dev&#39;@&#39;localhost&#39; ACCOUNT LOCK;
+      CREATE USER &#39;new_app_dev1&#39;@&#39;localhost&#39; IDENTIFIED BY &#39;new_password&#39;;
+      GRANT &#39;old_app_dev&#39;@&#39;localhost&#39; TO &#39;new_app_dev1&#39;@&#39;localhost&#39;;
+ )     
+角色的出现,使新版mysql 的权限控制更加灵活    
+
+注意:
+具有 SUPER 权限 的用户。可以修改数据 即便 数据库设置了read_only=on;可以在数据库连接达到max_connection后依然可以登录连接数据库。(5版本super 用户与普通用户共用max_connection数)
+
+4个预留用户
+&#39;root&#39;@&#39;localhost：用于管理目的。该帐户具有所有特权，是系统帐户，并且可以执行任何操作
+&#39;mysql.sys&#39;@&#39;localhost&#39;：作为 DEFINER对 sys架构对象。使用该 mysql.sys帐户可以避免在DBA重命名或删除该root 帐户时发生的问题。此帐户已锁定，因此不能用于客户端连接
+&#39;mysql.session&#39;@&#39;localhost&#39;：由插件内部使用以访问服务器。此帐户已锁定，因此不能用于客户端连接。该帐户是系统帐户
+&#39;mysql.infoschema&#39;@&#39;localhost&#39;：作为information_schema 视图的definer。使用该mysql.infoschema帐户可以避免在DBA重命名或删除root帐户时发生的问题。此帐户已锁定，因此不能用于客户端连接
+</code></pre>
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/database/" rel="tag"># database</a>
+              <a href="/tags/mysql-8/" rel="tag"># mysql 8</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/10/17/xtradbClusterInstall/" rel="prev" title="Percona xtradb Cluster 5.7 安装">
+      <i class="fa fa-chevron-left"></i> Percona xtradb Cluster 5.7 安装
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%B0%E7%89%B9%E6%80%A7"><span class="nav-number">1.</span> <span class="nav-text">新特性</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E7%94%A8%E6%88%B7%E8%A1%A8mysql-user"><span class="nav-number">1.1.</span> <span class="nav-text">用户表mysql.user</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%88%9B%E5%BB%BA%E6%96%B0%E8%A7%92%E8%89%B2"><span class="nav-number">1.2.</span> <span class="nav-text">创建新角色</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%BA%E8%A7%92%E8%89%B2%E6%8E%88%E6%9D%83%EF%BC%9A"><span class="nav-number">1.3.</span> <span class="nav-text">为角色授权：</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%BA%E7%94%A8%E6%88%B7%E6%8E%88%E6%9D%83%E8%A7%92%E8%89%B2"><span class="nav-number">1.4.</span> <span class="nav-text">为用户授权角色</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%BA%E7%94%A8%E6%88%B7%E8%AE%BE%E7%BD%AE%E5%B7%B2%E6%8E%88%E6%9D%83%E7%9A%84%E8%A7%92%E8%89%B2"><span class="nav-number">1.5.</span> <span class="nav-text">为用户设置已授权的角色</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%9B%9E%E6%94%B6%E6%8E%88%E6%9D%83%E7%BB%99%E7%94%A8%E6%88%B7%E7%9A%84%E8%A7%92%E8%89%B2"><span class="nav-number">1.6.</span> <span class="nav-text">回收授权给用户的角色</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#grant-%E6%9D%83%E9%99%90-on-db-to-role-name"><span class="nav-number">2.</span> <span class="nav-text">grant 权限 on db.* to role_name;</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%B0%E5%BB%BA%E7%94%A8%E6%88%B7%E8%B7%9F-5-%E7%89%88%E6%9C%AC%E6%9C%89%E5%8C%BA%E5%88%AB"><span class="nav-number">3.</span> <span class="nav-text">新建用户跟 5 版本有区别:</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%96%B0%E5%8F%82%E6%95%B0-mandatory-roles-%E5%BC%BA%E5%88%B6%E5%AE%9A%E4%B9%89%E8%A7%92%E8%89%B2%E5%8F%82%E6%95%B0%E3%80%82%E4%BD%BF%E7%94%A8%E8%AF%A5%E5%8F%82%E6%95%B0%EF%BC%8C%E5%88%99%E5%AE%9E%E4%BE%8B%E4%B8%8B%E6%89%80%E6%9C%89%E7%94%A8%E6%88%B7%E9%83%BD%E4%BC%9A%E8%A2%AB%E6%8E%88%E6%9D%83-mandatory-roles-%E6%8C%87%E5%AE%9A%E8%A7%92%E8%89%B2%E3%80%82%E8%80%8C%E4%B8%8D%E9%9C%80%E8%A6%81%E5%86%8D%E9%87%8D%E6%96%B0%E6%8E%88%E6%9D%83"><span class="nav-number">3.1.</span> <span class="nav-text">新参数 mandatory_roles 强制定义角色参数。使用该参数，则实例下所有用户都会被授权 mandatory_roles 指定角色。而不需要再重新授权</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Sheen</p>
+  <div class="site-description" itemprop="description">数据库相关技术研究,自动化运维</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">4</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">2</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">6</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Sheen</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/pjax/pjax.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[data-pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.dataset.pjax !== undefined) {
+      script.dataset.pjax = '';
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '78f8e6427a00d33b1454',
+      clientSecret: 'df55248398c379200efd40824ecae2d9fd208e20',
+      repo        : 'sheenzxx.github.io',
+      owner       : 'sheenzxx',
+      admin       : ['sheenzxx'],
+      id          : 'c43ee8f9f6d9b28b119c13dba3dba463',
+        language: 'zh-CN',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+    </div>
+</body>
+</html>
