@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
-    <title>diffOfReplicationConfig</title>
+    <title>mysql replication 设置命令在8.0.23后的变化</title>
     <url>/2022/10/18/diffOfReplicationConfig/</url>
     <content><![CDATA[<p>设置同步配置(8.0.23及以后)<br><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">CHANGE REPLICATION SOURCE TO</span><br><span class="line">    SOURCE_HOST=<span class="string">&#x27;source_host_name&#x27;</span>,</span><br><span class="line">    SOURCE_USER=<span class="string">&#x27;replication_user_name&#x27;</span>,</span><br><span class="line">    SOURCE_PASSWORD=<span class="string">&#x27;replication_password&#x27;</span>,</span><br><span class="line">    SOURCE_LOG_FILE=<span class="string">&#x27;recorded_log_file_name&#x27;</span>,</span><br><span class="line">    SOURCE_LOG_POS=recorded_log_position;</span><br></pre></td></tr></table></figure></p>
 <p>设置同步配置(8.0.23以前)<br><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">CHANGE MASTER TO</span><br><span class="line">    MASTER_HOST=<span class="string">&#x27;source_host_name&#x27;</span>,</span><br><span class="line">    MASTER_USER=<span class="string">&#x27;replication_user_name&#x27;</span>,</span><br><span class="line">    MASTER_PASSWORD=<span class="string">&#x27;replication_password&#x27;</span>,</span><br><span class="line">    MASTER_LOG_FILE=<span class="string">&#x27;recorded_log_file_name&#x27;</span>,</span><br><span class="line">    MASTER_LOG_POS=recorded_log_position;</span><br></pre></td></tr></table></figure></p>
