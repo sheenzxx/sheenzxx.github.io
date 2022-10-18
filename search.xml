@@ -15,20 +15,6 @@
       </tags>
   </entry>
   <entry>
-    <title>Hello World</title>
-    <url>/2022/10/14/hello-world/</url>
-    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
-<p>More info: <a href="https://hexo.io/docs/writing.html">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-<p>More info: <a href="https://hexo.io/docs/server.html">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-<p>More info: <a href="https://hexo.io/docs/generating.html">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
-]]></content>
-  </entry>
-  <entry>
     <title>mysql 8.0 用户权限部分</title>
     <url>/2022/10/17/mysql8User/</url>
     <content><![CDATA[<h3 id="新特性"><a href="#新特性" class="headerlink" title="新特性"></a>新特性</h3><h4 id="用户表mysql-user"><a href="#用户表mysql-user" class="headerlink" title="用户表mysql.user"></a>用户表mysql.user</h4><pre><code>user.host char(255)# 5版本为60,新版本为255,并且字符类型为ascii --&gt;  CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL DEFAULT &#39;&#39;
@@ -101,6 +87,20 @@ grant u1 to u2;
       </tags>
   </entry>
   <entry>
+    <title>Hello World</title>
+    <url>/2022/10/14/hello-world/</url>
+    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
+<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
+<p>More info: <a href="https://hexo.io/docs/writing.html">Writing</a></p>
+<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
+<p>More info: <a href="https://hexo.io/docs/server.html">Server</a></p>
+<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
+<p>More info: <a href="https://hexo.io/docs/generating.html">Generating</a></p>
+<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
+<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
+]]></content>
+  </entry>
+  <entry>
     <title>postgis 插件安装</title>
     <url>/2022/10/14/postgisInstall/</url>
     <content><![CDATA[<h3 id="安装简介"><a href="#安装简介" class="headerlink" title="安装简介"></a>安装简介</h3><p>安装postgresql(已有跳过)—-&gt;安装postgis所需要的依赖—-&gt;安装postgis—-&gt;进入postgresql数据库—-&gt;指定数据库添加扩展<br>postgresql是基础软件，因此是必须第一个安装的，而postgis的依赖可分为两个部分，一部分是必须的库，包含 geos库，gdal库，<br>proj库，json-c库，libXML2库，这五个库如果正确安装了，那么就已经可以编译安装postgis并在pg数据中创建扩展了，但是需要<br>说明的是，此时的postgis并不支持3d数据的分析，存储，计算等工作，仅仅支持2d的地理信息。如果需要支持3d 则需要再安装四个<br>库，这四个库分别是protobuf，protobuf-c，cgal，sfcgal，这四个库均依赖于boost 库,在选择版本上要以boost 库版本为基准。<br>下面来开始安装，以全新的环境未安装postgresql 数据库做示例,所有软件包均放在 /data 目录下</p>
@@ -157,6 +157,25 @@ grant u1 to u2;
         <tag>database</tag>
         <tag>postgis</tag>
         <tag>postgresql</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>gtid purged 的巧用</title>
+    <url>/2022/10/18/useGtidPurged/</url>
+    <content><![CDATA[<h3 id="今天根据冷备搭建主从-出现问题总结"><a href="#今天根据冷备搭建主从-出现问题总结" class="headerlink" title="今天根据冷备搭建主从,出现问题总结"></a>今天根据冷备搭建主从,出现问题总结</h3><h4 id="1-UUID-相同"><a href="#1-UUID-相同" class="headerlink" title="1 UUID 相同   ."></a>1 UUID 相同   .</h4><p>   清除 auto.cnf 文件。重启 重新生成UUID</p>
+<h4 id="2-change-master-后-报-从库需要的binglog-已经被主库purged"><a href="#2-change-master-后-报-从库需要的binglog-已经被主库purged" class="headerlink" title="2.change master 后  报 从库需要的binglog 已经被主库purged"></a>2.change master 后  报 从库需要的binglog 已经被主库purged</h4><p>   查询主库的 gtid_purged<br>   设置从库的gtid purged<br><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">master:</span><br><span class="line">show global variables like <span class="string">&#x27;%gtid%&#x27;</span> </span><br><span class="line">gtid_purged=<span class="string">&#x27;32dcbbd2-b9a7-11ea-a2cd-6c92bf060958:1-181880&#x27;</span></span><br><span class="line"></span><br><span class="line">slave: </span><br><span class="line">reset master;</span><br><span class="line">reset slave all;</span><br><span class="line"><span class="built_in">set</span> global gtid_purged=<span class="string">&#x27;32dcbbd2-b9a7-11ea-a2cd-6c92bf060958:1-181880&#x27;</span></span><br><span class="line">change master to ........ master_auto_position=1;</span><br></pre></td></tr></table></figure></p>
+<h4 id="3-发现从库是从已存的主库binlog-开始读取。这使从库落后5万多秒。"><a href="#3-发现从库是从已存的主库binlog-开始读取。这使从库落后5万多秒。" class="headerlink" title="3 发现从库是从已存的主库binlog 开始读取。这使从库落后5万多秒。"></a>3 发现从库是从已存的主库binlog 开始读取。这使从库落后5万多秒。</h4><p>分析从库正在执行的binlog 这些binglog 正是在写一个大表。而这个大表刚好是要清除掉的。<br>怎样修改 主库的gtid_purged<br>主库gtid purged 记录的是被清除binlog 的最后一个 gtid 。要跳过这些已经执行过的binlog .那么就需要再重置一次binlog purged<br><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"> purge master logs to <span class="string">&#x27;mysql-bin.000112&#x27;</span>;</span><br><span class="line">mysql.sock@(none)&gt; show global variables like <span class="string">&#x27;%gtid%&#x27;</span>;</span><br><span class="line">+---------------------------------+-----------------------------------------------+</span><br><span class="line">| Variable_name                   | Value                                         |</span><br><span class="line">+---------------------------------+-----------------------------------------------+</span><br><span class="line">| binlog_gtid_simple_recovery     | OFF                                           |</span><br><span class="line">| enforce_gtid_consistency        | ON                                            |</span><br><span class="line">| gtid_executed                   | 32dcbbd2-b9a7-11ea-a2cd-6c92bf060958:1-187811 |</span><br><span class="line">| gtid_mode                       | ON                                            |</span><br><span class="line">| gtid_owned                      |                                               |</span><br><span class="line">| gtid_purged                     | 32dcbbd2-b9a7-11ea-a2cd-6c92bf060958:1-187809 |</span><br><span class="line">| simplified_binlog_gtid_recovery | OFF                                           |</span><br><span class="line">+---------------------------------+-----------------------------------------------+</span><br></pre></td></tr></table></figure><br>主库的gtid_purged 已经跳到已知最后一个binlog </p>
+<p>重置从库。重新设置主从关系。将gtid_purged 设置到 32dcbbd2-b9a7-11ea-a2cd-6c92bf060958:1-187809</p>
+<p>从库成功跳过不需要执行的binlog .正常运行</p>
+<h4 id="结语"><a href="#结语" class="headerlink" title="结语"></a>结语</h4><p>这些操作基于冷备。主从库的数据是一致的。而且中间没有任何其他操作在主库产生。如有,则要知道那些必须执行过的操作落在哪。<br>取主库重启后第一个产生的Binlog 为界限。</p>
+]]></content>
+      <categories>
+        <category>mysql</category>
+      </categories>
+      <tags>
+        <tag>database</tag>
+        <tag>mysql 5.6</tag>
+        <tag>gtid</tag>
       </tags>
   </entry>
   <entry>

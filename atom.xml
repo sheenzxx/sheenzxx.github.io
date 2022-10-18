@@ -6,7 +6,7 @@
   <link href="https://sheenzxx.github.io/atom.xml" rel="self"/>
   
   <link href="https://sheenzxx.github.io/"/>
-  <updated>2022-10-18T06:55:11.062Z</updated>
+  <updated>2022-10-18T07:08:47.468Z</updated>
   <id>https://sheenzxx.github.io/</id>
   
   <author>
@@ -15,6 +15,34 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>gtid purged 的巧用</title>
+    <link href="https://sheenzxx.github.io/2022/10/18/useGtidPurged/"/>
+    <id>https://sheenzxx.github.io/2022/10/18/useGtidPurged/</id>
+    <published>2022-10-18T07:00:58.000Z</published>
+    <updated>2022-10-18T07:08:47.468Z</updated>
+    
+    <content type="html"><![CDATA[<h3 id="今天根据冷备搭建主从-出现问题总结"><a href="#今天根据冷备搭建主从-出现问题总结" class="headerlink" title="今天根据冷备搭建主从,出现问题总结"></a>今天根据冷备搭建主从,出现问题总结</h3><h4 id="1-UUID-相同"><a href="#1-UUID-相同" class="headerlink" title="1 UUID 相同   ."></a>1 UUID 相同   .</h4><p>   清除 auto.cnf 文件。重启 重新生成UUID</p><h4 id="2-change-master-后-报-从库需要的binglog-已经被主库purged"><a href="#2-change-master-后-报-从库需要的binglog-已经被主库purged" class="headerlink" title="2.change master 后  报 从库需要的binglog 已经被主库purged"></a>2.change master 后  报 从库需要的binglog 已经被主库purged</h4><p>   查询主库的 gtid_purged<br>   设置从库的gtid purged<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">master:</span><br><span class="line">show global variables like <span class="string">&#x27;%gtid%&#x27;</span> </span><br><span class="line">gtid_purged=<span class="string">&#x27;32dcbbd2-b9a7-11ea-a2cd-6c92bf060958:1-181880&#x27;</span></span><br><span class="line"></span><br><span class="line">slave: </span><br><span class="line">reset master;</span><br><span class="line">reset slave all;</span><br><span class="line"><span class="built_in">set</span> global gtid_purged=<span class="string">&#x27;32dcbbd2-b9a7-11ea-a2cd-6c92bf060958:1-181880&#x27;</span></span><br><span class="line">change master to ........ master_auto_position=1;</span><br></pre></td></tr></table></figure></p><h4 id="3-发现从库是从已存的主库binlog-开始读取。这使从库落后5万多秒。"><a href="#3-发现从库是从已存的主库binlog-开始读取。这使从库落后5万多秒。" class="headerlink" title="3 发现从库是从已存的主库binlog 开始读取。这使从库落后5万多秒。"></a>3 发现从库是从已存的主库binlog 开始读取。这使从库落后5万多秒。</h4><p>分析从库正在执行的binlog 这些binglog 正是在写一个大表。而这个大表刚好是要清除掉的。<br>怎样修改 主库的gtid_purged<br>主库gtid purged 记录的是被清除binlog 的最后一个 gtid 。要跳过这些已经执行过的binlog .那么就需要再重置一次binlog purged<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"> purge master logs to <span class="string">&#x27;mysql-bin.000112&#x27;</span>;</span><br><span class="line">mysql.sock@(none)&gt; show global variables like <span class="string">&#x27;%gtid%&#x27;</span>;</span><br><span class="line">+---------------------------------+-----------------------------------------------+</span><br><span class="line">| Variable_name                   | Value                                         |</span><br><span class="line">+---------------------------------+-----------------------------------------------+</span><br><span class="line">| binlog_gtid_simple_recovery     | OFF                                           |</span><br><span class="line">| enforce_gtid_consistency        | ON                                            |</span><br><span class="line">| gtid_executed                   | 32dcbbd2-b9a7-11ea-a2cd-6c92bf060958:1-187811 |</span><br><span class="line">| gtid_mode                       | ON                                            |</span><br><span class="line">| gtid_owned                      |                                               |</span><br><span class="line">| gtid_purged                     | 32dcbbd2-b9a7-11ea-a2cd-6c92bf060958:1-187809 |</span><br><span class="line">| simplified_binlog_gtid_recovery | OFF                                           |</span><br><span class="line">+---------------------------------+-----------------------------------------------+</span><br></pre></td></tr></table></figure><br>主库的gtid_purged 已经跳到已知最后一个binlog </p><p>重置从库。重新设置主从关系。将gtid_purged 设置到 32dcbbd2-b9a7-11ea-a2cd-6c92bf060958:1-187809</p><p>从库成功跳过不需要执行的binlog .正常运行</p><h4 id="结语"><a href="#结语" class="headerlink" title="结语"></a>结语</h4><p>这些操作基于冷备。主从库的数据是一致的。而且中间没有任何其他操作在主库产生。如有,则要知道那些必须执行过的操作落在哪。<br>取主库重启后第一个产生的Binlog 为界限。</p>]]></content>
+    
+    
+      
+      
+    <summary type="html">&lt;h3 id=&quot;今天根据冷备搭建主从-出现问题总结&quot;&gt;&lt;a href=&quot;#今天根据冷备搭建主从-出现问题总结&quot; class=&quot;headerlink&quot; title=&quot;今天根据冷备搭建主从,出现问题总结&quot;&gt;&lt;/a&gt;今天根据冷备搭建主从,出现问题总结&lt;/h3&gt;&lt;h4 id=&quot;1-UUI</summary>
+      
+    
+    
+    
+    <category term="mysql" scheme="https://sheenzxx.github.io/categories/mysql/"/>
+    
+    
+    <category term="database" scheme="https://sheenzxx.github.io/tags/database/"/>
+    
+    <category term="mysql 5.6" scheme="https://sheenzxx.github.io/tags/mysql-5-6/"/>
+    
+    <category term="gtid" scheme="https://sheenzxx.github.io/tags/gtid/"/>
+    
+  </entry>
   
   <entry>
     <title>mysql replication 设置命令在8.0.23后的变化</title>
