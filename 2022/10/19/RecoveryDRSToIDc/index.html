@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"sheenzxx.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"gitalk","storage":true,"lazyload":false,"nav":null,"activeClass":"gitalk"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="1. 登录阿里云控制台，然后在数据库实例里面选择我们需要操作的实例，在备份恢复选项中，找到最新的全备下载。可选方式为外网以及内网。根据自己环境决定2. 下载备份文件1wget -c &quot;https:&#x2F;&#x2F;rdsbak-st-v2.oss-cn-shenzhen-internal.aliyuncs.com&#x2F;custinxxxxxxx&#x2F;hins21434496_data_202210190457">
+<meta property="og:type" content="article">
+<meta property="og:title" content="将阿里云RDS备份拉回IDC做从库">
+<meta property="og:url" content="https://sheenzxx.github.io/2022/10/19/RecoveryDRSToIDc/index.html">
+<meta property="og:site_name" content="sheen&#39;s Blog">
+<meta property="og:description" content="1. 登录阿里云控制台，然后在数据库实例里面选择我们需要操作的实例，在备份恢复选项中，找到最新的全备下载。可选方式为外网以及内网。根据自己环境决定2. 下载备份文件1wget -c &quot;https:&#x2F;&#x2F;rdsbak-st-v2.oss-cn-shenzhen-internal.aliyuncs.com&#x2F;custinxxxxxxx&#x2F;hins21434496_data_202210190457">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2022-10-19T06:05:57.000Z">
+<meta property="article:modified_time" content="2022-10-19T06:57:54.789Z">
+<meta property="article:author" content="Sheen">
+<meta property="article:tag" content="database">
+<meta property="article:tag" content="mysql">
+<meta property="article:tag" content="aliyun RDS">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://sheenzxx.github.io/2022/10/19/RecoveryDRSToIDc/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>将阿里云RDS备份拉回IDC做从库 | sheen's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="sheen's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">sheen's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">随笔，技术笔记</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/home/" rel="section"><i class="home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://sheenzxx.github.io/2022/10/19/RecoveryDRSToIDc/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Sheen">
+      <meta itemprop="description" content="数据库相关技术研究,自动化运维">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="sheen's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          将阿里云RDS备份拉回IDC做从库
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-10-19 14:05:57 / 修改时间：14:57:54" itemprop="dateCreated datePublished" datetime="2022-10-19T14:05:57+08:00">2022-10-19</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/mysql/" itemprop="url" rel="index"><span itemprop="name">mysql</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h3 id="1-登录阿里云控制台，然后在数据库实例里面选择我们需要操作的实例，在备份恢复选项中，找到最新的全备下载。可选方式为外网以及内网。根据自己环境决定"><a href="#1-登录阿里云控制台，然后在数据库实例里面选择我们需要操作的实例，在备份恢复选项中，找到最新的全备下载。可选方式为外网以及内网。根据自己环境决定" class="headerlink" title="1. 登录阿里云控制台，然后在数据库实例里面选择我们需要操作的实例，在备份恢复选项中，找到最新的全备下载。可选方式为外网以及内网。根据自己环境决定"></a>1. 登录阿里云控制台，然后在数据库实例里面选择我们需要操作的实例，在备份恢复选项中，找到最新的全备下载。可选方式为外网以及内网。根据自己环境决定</h3><h3 id="2-下载备份文件"><a href="#2-下载备份文件" class="headerlink" title="2. 下载备份文件"></a>2. 下载备份文件</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">wget -c <span class="string">&quot;https://rdsbak-st-v2.oss-cn-shenzhen-internal.aliyuncs.com/custinxxxxxxx/hins21434496_data_20221019045743_qp.xb?xxxxxxxxxxxx.....&quot;</span> -O hins21434496_data_20221019045743_qp.xb </span><br></pre></td></tr></table></figure>
+<h3 id="3-解压文件恢复xtrbackup-备份"><a href="#3-解压文件恢复xtrbackup-备份" class="headerlink" title="3.解压文件恢复xtrbackup 备份"></a>3.解压文件恢复xtrbackup 备份</h3><h5 id="A-如果环境中没有qpress-跟-xtrabackup-工具-则需要先下载安装"><a href="#A-如果环境中没有qpress-跟-xtrabackup-工具-则需要先下载安装" class="headerlink" title="A. 如果环境中没有qpress 跟 xtrabackup 工具 则需要先下载安装"></a>A. 如果环境中没有qpress 跟 xtrabackup 工具 则需要先下载安装</h5><p>对于MySQL 5.7、5.6或5.5实例：安装Percona XtraBackup 2.4。<br>对于MySQL 8.0实例，安装Percona XtraBackup 8.0。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">wget <span class="string">&quot;http://docs-aliyun.cn-hangzhou.oss.aliyun-inc.com/assets/attach/183466/cn_zh/1608011575185/qpress-11-linux-x64.tar&quot;</span></span><br><span class="line">tar xvf qpress-11-linux-x64.tar</span><br><span class="line"><span class="built_in">chmod</span> 775 qpress</span><br><span class="line"><span class="built_in">cp</span> qpress /usr/bin</span><br></pre></td></tr></table></figure><br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">yum -y install libev</span><br><span class="line">wget <span class="string">&quot;https://downloads.percona.com/downloads/Percona-XtraBackup-2.4/Percona-XtraBackup-2.4.26/binary/redhat/7/x86_64/percona-xtrabackup-24-2.4.26-1.el7.x86_64.rpm&quot;</span></span><br><span class="line">yum -y install percona-xtrabackup-24-2.4.26-1.el7.x86_64.rpm</span><br></pre></td></tr></table></figure></p>
+<h5 id="B-解压恢复"><a href="#B-解压恢复" class="headerlink" title="B. 解压恢复"></a>B. 解压恢复</h5><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">mkdir</span> data_common_xtrabackup</span><br><span class="line"><span class="built_in">cat</span> hins21434496_data_20221019045743_qp.xb | xbstream -x -v -C /usr/local/mysql/data_common_xtrabackup</span><br><span class="line">innobackupex --decompress --remove-original /usr/local/mysql/data_common_xtrabackup</span><br><span class="line">innobackupex --default-files=/usr/local/mysql/data_common_xtrabackup/backup-my.cnf --apply-log /usr/local/mysql/data_common_xtrabackup</span><br></pre></td></tr></table></figure>
+<h3 id="4-搭建从库"><a href="#4-搭建从库" class="headerlink" title="4. 搭建从库"></a>4. 搭建从库</h3><h5 id="A-将backup-my-cnf-的innodb-部分参数添加到本地IDC-etc-my-cnf"><a href="#A-将backup-my-cnf-的innodb-部分参数添加到本地IDC-etc-my-cnf" class="headerlink" title="A. 将backup-my.cnf 的innodb 部分参数添加到本地IDC /etc/my.cnf"></a>A. 将backup-my.cnf 的innodb 部分参数添加到本地IDC /etc/my.cnf</h5><pre><code>innodb_log_files_in_group=2
+innodb_log_file_size=1572864000
+innodb_log_buffer_size=8388608
+innodb_page_size=16384
+innodb_undo_tablespaces=2
+</code></pre><h5 id="B-完整的配置文件部分"><a href="#B-完整的配置文件部分" class="headerlink" title="B. 完整的配置文件部分"></a>B. 完整的配置文件部分</h5><pre><code>[mysqld4]
+port    = 3309
+socket  = /tmp/mysql.common_aliyun_slave.sock
+datadir = /usr/local/mysql/data_common_aliyun_slave
+innodb_data_home_dir = /usr/local/mysql/data_common_aliyun_slave
+innodb_undo_directory = /usr/local/mysql/data_common_aliyun_slave
+innodb_log_group_home_dir = /usr/local/mysql/data_common_aliyun_slave
+innodb_buffer_pool_size = 10G
+innodb_buffer_pool_instances = 10
+innodb_fast_shutdown=0
+innodb_log_files_in_group=2
+innodb_log_file_size=1572864000
+innodb_log_buffer_size=8388608
+innodb_page_size=16384
+innodb_undo_tablespaces=2
+init_connect=&#39;set names utf8mb4&#39;
+character-set-server=utf8mb4
+server-id = 186
+collation-server=utf8mb4_general_ci
+log-slave-updates = true
+skip-grant-tables #这个参数先添加以便去除权限登录数据库修改
+</code></pre><h5 id="C-将恢复目录里面mysql-库的两个trigger-重命名-重置root-密码相关信息"><a href="#C-将恢复目录里面mysql-库的两个trigger-重命名-重置root-密码相关信息" class="headerlink" title="C. 将恢复目录里面mysql 库的两个trigger 重命名,重置root 密码相关信息"></a>C. 将恢复目录里面mysql 库的两个trigger 重命名,重置root 密码相关信息</h5><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cd</span> /usr/local/mysql/data_common_aliyun_slave/mysql</span><br><span class="line"><span class="built_in">mv</span> user.TRG user.TRG.bak</span><br><span class="line"><span class="built_in">mv</span> proxies_priv.TRG proxies_priv.TRG.bak</span><br><span class="line">mysqld_multi start 4</span><br><span class="line">mysql -uroot -p -S /tmp/mysql.common_aliyun_slave.sock</span><br><span class="line">mysql&gt; use mysql</span><br><span class="line">mysql&gt; update user <span class="built_in">set</span> authentication_string=password(<span class="string">&#x27;xxx&#x27;</span>),host=<span class="string">&#x27;localhost&#x27;</span>,user=<span class="string">&#x27;root&#x27;</span> <span class="built_in">where</span> user=<span class="string">&#x27;aliyun_root&#x27;</span>;</span><br><span class="line">mysql&gt; flush privileges;</span><br><span class="line">mysql&gt; <span class="built_in">exit</span>;</span><br></pre></td></tr></table></figure>
+<h5 id="D-查看恢复目录里面的-xtrabackup-info-文件-gtid-execute-信息"><a href="#D-查看恢复目录里面的-xtrabackup-info-文件-gtid-execute-信息" class="headerlink" title="D. 查看恢复目录里面的 xtrabackup_info 文件 gtid execute 信息"></a>D. 查看恢复目录里面的 xtrabackup_info 文件 gtid execute 信息</h5><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cat</span> xtrabackup_info</span><br><span class="line">uuid = 99c6d1c2-4f2f-11ed-b7c8-0c42a1b70fa6</span><br><span class="line">name = </span><br><span class="line">.....</span><br><span class="line">lock_time = 1</span><br><span class="line">binlog_pos = filename <span class="string">&#x27;mysql-bin.000834&#x27;</span>, position 15350993, GTID of the last change <span class="string">&#x27;8e1da966-c6d7-11ec-ba02-0c42a1da3126:1-130585536&#x27;</span></span><br><span class="line">innodb_from_lsn = 0</span><br><span class="line">innodb_to_lsn = 437844748178</span><br><span class="line">partial = N</span><br><span class="line">incremental = N</span><br><span class="line">format = xbstream</span><br><span class="line">compact = N</span><br><span class="line">compressed = compressed</span><br><span class="line">encrypted = N</span><br></pre></td></tr></table></figure>
+<h5 id="E-查看主库的gtid-purged-信息"><a href="#E-查看主库的gtid-purged-信息" class="headerlink" title="E. 查看主库的gtid purged 信息"></a>E. 查看主库的gtid purged 信息</h5><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; SHOW GLOBAL VARIABLES LIKE <span class="string">&#x27;gtid_purged&#x27;</span>; </span><br><span class="line">8e1da966-c6d7-11ec-ba02-0c42a1da3126:1-130084627</span><br></pre></td></tr></table></figure>
+<h5 id="F-将恢复的IDC实例作为云上的从库"><a href="#F-将恢复的IDC实例作为云上的从库" class="headerlink" title="F. 将恢复的IDC实例作为云上的从库"></a>F. 将恢复的IDC实例作为云上的从库</h5><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; reset slave;</span><br><span class="line">mysql&gt; reset master;</span><br><span class="line">mysql&gt; <span class="built_in">set</span> @@global.gtid_purged=<span class="string">&#x27;8e1da966-c6d7-11ec-ba02-0c42a1da3126:1-130084627,8e1da966-c6d7-11ec-ba02-0c42a1da3126:1-130585536&#x27;</span></span><br><span class="line">mysql&gt; change master to</span><br><span class="line">mysql&gt; master_host=<span class="string">&#x27;xxxx.aliyun.xxxxx&#x27;</span>,</span><br><span class="line">mysql&gt; master_port=<span class="string">&#x27;xxxx&#x27;</span>,</span><br><span class="line">mysql&gt; master_user=<span class="string">&#x27;repuser&#x27;</span>,</span><br><span class="line">mysql&gt; master_password=<span class="string">&#x27;reppass&#x27;</span>,</span><br><span class="line">mysql&gt; master_auto_position=1;</span><br><span class="line">mysql&gt; start slave;</span><br><span class="line">mysql&gt; show slave status\G;</span><br></pre></td></tr></table></figure>
+<p>可以看到数据库已经正确连接到阿里云上RDS</p>
+<h3 id="5-注意"><a href="#5-注意" class="headerlink" title="5. 注意"></a>5. 注意</h3><p>set @@global.gtid_purged=’主库的gtid_purged,从库的gtid_excuted’<br>master_user ， master_password 为RDS 实例上已经建好具有 select, replication_slave 的权限账号以及密码</p>
+<p>上面有将2个trigger 重命名的操作。是因为阿里的数据库对user 表做了限制。只有把2个trigger 拿掉,才能修改用户表<br>否则将报如下错误<br>    ERROR 1064 (42000): Unknown trigger has an error in its body: ‘Unknown system variable ‘maintain_user_list’’</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/database/" rel="tag"># database</a>
+              <a href="/tags/mysql/" rel="tag"># mysql</a>
+              <a href="/tags/aliyun-RDS/" rel="tag"># aliyun RDS</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/10/18/useGtidPurged/" rel="prev" title="gtid purged 的巧用">
+      <i class="fa fa-chevron-left"></i> gtid purged 的巧用
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E7%99%BB%E5%BD%95%E9%98%BF%E9%87%8C%E4%BA%91%E6%8E%A7%E5%88%B6%E5%8F%B0%EF%BC%8C%E7%84%B6%E5%90%8E%E5%9C%A8%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AE%9E%E4%BE%8B%E9%87%8C%E9%9D%A2%E9%80%89%E6%8B%A9%E6%88%91%E4%BB%AC%E9%9C%80%E8%A6%81%E6%93%8D%E4%BD%9C%E7%9A%84%E5%AE%9E%E4%BE%8B%EF%BC%8C%E5%9C%A8%E5%A4%87%E4%BB%BD%E6%81%A2%E5%A4%8D%E9%80%89%E9%A1%B9%E4%B8%AD%EF%BC%8C%E6%89%BE%E5%88%B0%E6%9C%80%E6%96%B0%E7%9A%84%E5%85%A8%E5%A4%87%E4%B8%8B%E8%BD%BD%E3%80%82%E5%8F%AF%E9%80%89%E6%96%B9%E5%BC%8F%E4%B8%BA%E5%A4%96%E7%BD%91%E4%BB%A5%E5%8F%8A%E5%86%85%E7%BD%91%E3%80%82%E6%A0%B9%E6%8D%AE%E8%87%AA%E5%B7%B1%E7%8E%AF%E5%A2%83%E5%86%B3%E5%AE%9A"><span class="nav-number">1.</span> <span class="nav-text">1. 登录阿里云控制台，然后在数据库实例里面选择我们需要操作的实例，在备份恢复选项中，找到最新的全备下载。可选方式为外网以及内网。根据自己环境决定</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E4%B8%8B%E8%BD%BD%E5%A4%87%E4%BB%BD%E6%96%87%E4%BB%B6"><span class="nav-number">2.</span> <span class="nav-text">2. 下载备份文件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E8%A7%A3%E5%8E%8B%E6%96%87%E4%BB%B6%E6%81%A2%E5%A4%8Dxtrbackup-%E5%A4%87%E4%BB%BD"><span class="nav-number">3.</span> <span class="nav-text">3.解压文件恢复xtrbackup 备份</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#A-%E5%A6%82%E6%9E%9C%E7%8E%AF%E5%A2%83%E4%B8%AD%E6%B2%A1%E6%9C%89qpress-%E8%B7%9F-xtrabackup-%E5%B7%A5%E5%85%B7-%E5%88%99%E9%9C%80%E8%A6%81%E5%85%88%E4%B8%8B%E8%BD%BD%E5%AE%89%E8%A3%85"><span class="nav-number">3.0.1.</span> <span class="nav-text">A. 如果环境中没有qpress 跟 xtrabackup 工具 则需要先下载安装</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#B-%E8%A7%A3%E5%8E%8B%E6%81%A2%E5%A4%8D"><span class="nav-number">3.0.2.</span> <span class="nav-text">B. 解压恢复</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-%E6%90%AD%E5%BB%BA%E4%BB%8E%E5%BA%93"><span class="nav-number">4.</span> <span class="nav-text">4. 搭建从库</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#A-%E5%B0%86backup-my-cnf-%E7%9A%84innodb-%E9%83%A8%E5%88%86%E5%8F%82%E6%95%B0%E6%B7%BB%E5%8A%A0%E5%88%B0%E6%9C%AC%E5%9C%B0IDC-etc-my-cnf"><span class="nav-number">4.0.1.</span> <span class="nav-text">A. 将backup-my.cnf 的innodb 部分参数添加到本地IDC &#x2F;etc&#x2F;my.cnf</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#B-%E5%AE%8C%E6%95%B4%E7%9A%84%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6%E9%83%A8%E5%88%86"><span class="nav-number">4.0.2.</span> <span class="nav-text">B. 完整的配置文件部分</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#C-%E5%B0%86%E6%81%A2%E5%A4%8D%E7%9B%AE%E5%BD%95%E9%87%8C%E9%9D%A2mysql-%E5%BA%93%E7%9A%84%E4%B8%A4%E4%B8%AAtrigger-%E9%87%8D%E5%91%BD%E5%90%8D-%E9%87%8D%E7%BD%AEroot-%E5%AF%86%E7%A0%81%E7%9B%B8%E5%85%B3%E4%BF%A1%E6%81%AF"><span class="nav-number">4.0.3.</span> <span class="nav-text">C. 将恢复目录里面mysql 库的两个trigger 重命名,重置root 密码相关信息</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#D-%E6%9F%A5%E7%9C%8B%E6%81%A2%E5%A4%8D%E7%9B%AE%E5%BD%95%E9%87%8C%E9%9D%A2%E7%9A%84-xtrabackup-info-%E6%96%87%E4%BB%B6-gtid-execute-%E4%BF%A1%E6%81%AF"><span class="nav-number">4.0.4.</span> <span class="nav-text">D. 查看恢复目录里面的 xtrabackup_info 文件 gtid execute 信息</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#E-%E6%9F%A5%E7%9C%8B%E4%B8%BB%E5%BA%93%E7%9A%84gtid-purged-%E4%BF%A1%E6%81%AF"><span class="nav-number">4.0.5.</span> <span class="nav-text">E. 查看主库的gtid purged 信息</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#F-%E5%B0%86%E6%81%A2%E5%A4%8D%E7%9A%84IDC%E5%AE%9E%E4%BE%8B%E4%BD%9C%E4%B8%BA%E4%BA%91%E4%B8%8A%E7%9A%84%E4%BB%8E%E5%BA%93"><span class="nav-number">4.0.6.</span> <span class="nav-text">F. 将恢复的IDC实例作为云上的从库</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-%E6%B3%A8%E6%84%8F"><span class="nav-number">5.</span> <span class="nav-text">5. 注意</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Sheen</p>
+  <div class="site-description" itemprop="description">数据库相关技术研究,自动化运维</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">7</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">2</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Sheen</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/pjax/pjax.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[data-pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.dataset.pjax !== undefined) {
+      script.dataset.pjax = '';
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '78f8e6427a00d33b1454',
+      clientSecret: 'df55248398c379200efd40824ecae2d9fd208e20',
+      repo        : 'sheenzxx.github.io',
+      owner       : 'sheenzxx',
+      admin       : ['sheenzxx'],
+      id          : '189abf654005e3748c2a0d620688c27d',
+        language: 'zh-CN',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+    </div>
+</body>
+</html>
