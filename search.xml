@@ -79,6 +79,49 @@ skip-grant-tables #这个参数先添加以便去除权限登录数据库修改
 ]]></content>
   </entry>
   <entry>
+    <title>利用pglogical 给阿里云数据搭建IDC 逻辑复制库</title>
+    <url>/2022/10/20/pglogical/</url>
+    <content><![CDATA[<p>将阿里云RDS 数据同步回IDC 做备库，最佳选择是DTS，当然想省钱的话，我们不妨来做个逻辑复制</p>
+<h4 id="pg-逻辑复制的要求"><a href="#pg-逻辑复制的要求" class="headerlink" title="pg 逻辑复制的要求:"></a>pg 逻辑复制的要求:</h4><pre><code>1.postgresql 10+ 版本
+2.wal_level 设置为 pglogical
+3.max_replication_slots 至少设置为1 
+4.逻辑复制采用发布,订阅模式。即在主库创建发布。在备库创建订阅
+5.目前仅支持 INSERT ,UPDATE , DELETE 操作，11+ 支持 TRUNCATE ,不支持DDL。
+6.被发布表（published table ）。必须都有一个复制标识。默认是表的主键，或者有唯一键 都可以被设置为复制标志。如果没有任何唯一标识可用。则会设置为full,已整列数据作为标志
+7.订阅者连接发布的用户必须具有super 权限，如果具有super 权限。订阅将由pg_dump 转储，如果不具备super 权限则无法在 pg_subscription 中读取订阅信息，订阅将会被跳过。
+8.发布数据库源表必须在订阅库中目标表以同名存在，订阅库目标表可以比发布库源表多字段,但源表字段必须在目标库都存在,对应的字段名也应该相同，不要求顺序相同，字段类型也只需要能够自动转换即可。
+</code></pre><p>下面开始演示<br>由于云库RDS 我们一般都不具有super 权限。我们在创建发布者时，就没办法 create publication xxx for all tables; 只能按表来添加</p>
+<h4 id="1-导出发布端数据表结构（注意这里只复制指定的schema-表）"><a href="#1-导出发布端数据表结构（注意这里只复制指定的schema-表）" class="headerlink" title="1. 导出发布端数据表结构（注意这里只复制指定的schema 表）"></a>1. 导出发布端数据表结构（注意这里只复制指定的schema 表）</h4><pre><code>pg_dump -f publication_db.meta.sql -U publication_db -s publication_db -h xxxx.aliyun.com -p port
+</code></pre><h4 id="2-订阅端导入表"><a href="#2-订阅端导入表" class="headerlink" title="2. 订阅端导入表"></a>2. 订阅端导入表</h4><pre><code>create database publication_db owner xxxx  tablespace xxxx;
+psql -U publication_db -d publication_db &lt; publication_db.meta.sql
+</code></pre><h4 id="3-查看发布端是否具备逻辑复制条件"><a href="#3-查看发布端是否具备逻辑复制条件" class="headerlink" title="3. 查看发布端是否具备逻辑复制条件"></a>3. 查看发布端是否具备逻辑复制条件</h4><pre><code>show wal_level;
+wal_level =logical 
+show max_replication_slots;
+max_replication_slots = 10
+show max_wal_senders;
+max_wal_senders = 10
+</code></pre><p>   按照上述要求，如果不是则进行调整。然后重启数据库（生产环境重启数据库必须与业务协商）</p>
+<h4 id="4-发布端创建发布"><a href="#4-发布端创建发布" class="headerlink" title="4. 发布端创建发布"></a>4. 发布端创建发布</h4><pre><code> create publication publication_db_logical for table xxxx;
+ Select * from pg_publication; #查看发布者信息
+</code></pre><h4 id="5-订阅端创建订阅"><a href="#5-订阅端创建订阅" class="headerlink" title="5. 订阅端创建订阅"></a>5. 订阅端创建订阅</h4><pre><code>\c publication_db superUser
+create subscription publication_db_sub connction &#39;host=aliyun.db.domain port=xxx dbname=publication_db user=superUser password=xxxx&#39; publication publication_db_logical;
+##对于pg中无法解析域名，我们可以先ping 下 RDS的域名。以得到真实IP，然后在/etc/hosts 中对应添加 ip  域名
+select * from pg_subscription; #查看订阅信息
+</code></pre><h4 id="6-在发布端查看是否已经启动复制进程"><a href="#6-在发布端查看是否已经启动复制进程" class="headerlink" title="6. 在发布端查看是否已经启动复制进程"></a>6. 在发布端查看是否已经启动复制进程</h4><pre><code>select * from pg_stat_replication;
+</code></pre><h4 id="7-订阅创建成功后"><a href="#7-订阅创建成功后" class="headerlink" title="7. 订阅创建成功后"></a>7. 订阅创建成功后</h4><pre><code>订阅端首先进行的是表数据初始化。即在发布端全量拉取数据过来，完成后再进行增量同步
+</code></pre><h4 id="8-添加余下的表到发布中"><a href="#8-添加余下的表到发布中" class="headerlink" title="8. 添加余下的表到发布中"></a>8. 添加余下的表到发布中</h4><pre><code>alter publication publication_db_logical add table tab1,tab2,tab3....
+</code></pre><h4 id="9-在订阅端刷新订阅"><a href="#9-在订阅端刷新订阅" class="headerlink" title="9. 在订阅端刷新订阅"></a>9. 在订阅端刷新订阅</h4><pre><code>alter subscription mysub refresh publication;  #只有发动刷新。发布端的变动才会同步过来
+</code></pre><h3 id="如果发布表需要增加字段。逻辑复制还能继续吗？"><a href="#如果发布表需要增加字段。逻辑复制还能继续吗？" class="headerlink" title="如果发布表需要增加字段。逻辑复制还能继续吗？"></a>如果发布表需要增加字段。逻辑复制还能继续吗？</h3><p>如果发布表增加了字段。而订阅表没有添加字段，逻辑复制就会中断。这个时候，只要在路基复制库中对应表添加相应字段，再把订阅启动起来，就可以了。<br>正确的添加顺序。应该在逻辑库先添加字段。然后再在发布库添加字段。然后看看是否复制正常。复制不正常就先停下复制。再启动复制即可</p>
+]]></content>
+      <categories>
+        <category>postgres</category>
+      </categories>
+      <tags>
+        <tag>database</tag>
+        <tag>pglogical</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>mysql 8.0 用户权限部分</title>
     <url>/2022/10/17/mysql8User/</url>
     <content><![CDATA[<h3 id="新特性"><a href="#新特性" class="headerlink" title="新特性"></a>新特性</h3><h4 id="用户表mysql-user"><a href="#用户表mysql-user" class="headerlink" title="用户表mysql.user"></a>用户表mysql.user</h4><pre><code>user.host char(255)# 5版本为60,新版本为255,并且字符类型为ascii --&gt;  CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL DEFAULT &#39;&#39;
