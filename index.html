@@ -439,7 +439,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-10-27 17:31:08" itemprop="dateModified" datetime="2022-10-27T17:31:08+08:00">2022-10-27</time>
+                <time title="修改时间：2022-10-28 15:21:15" itemprop="dateModified" datetime="2022-10-28T15:21:15+08:00">2022-10-28</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -492,7 +492,7 @@ select * from pg_subscription; #查看订阅信息
 </code></pre><h4 id="7-订阅创建成功后"><a href="#7-订阅创建成功后" class="headerlink" title="7. 订阅创建成功后"></a>7. 订阅创建成功后</h4><pre><code>订阅端首先进行的是表数据初始化。即在发布端全量拉取数据过来，完成后再进行增量同步
 </code></pre><h4 id="8-添加余下的表到发布中"><a href="#8-添加余下的表到发布中" class="headerlink" title="8. 添加余下的表到发布中"></a>8. 添加余下的表到发布中</h4><pre><code>alter publication publication_db_logical add table tab1,tab2,tab3....
 </code></pre><h4 id="9-在订阅端刷新订阅"><a href="#9-在订阅端刷新订阅" class="headerlink" title="9. 在订阅端刷新订阅"></a>9. 在订阅端刷新订阅</h4><pre><code>alter subscription mysub refresh publication;  #只有发动刷新。发布端的变动才会同步过来
-</code></pre><h3 id="如果发布表需要增加字段。逻辑复制还能继续吗？"><a href="#如果发布表需要增加字段。逻辑复制还能继续吗？" class="headerlink" title="如果发布表需要增加字段。逻辑复制还能继续吗？"></a>如果发布表需要增加字段。逻辑复制还能继续吗？</h3><p>如果发布表增加了字段。而订阅表没有添加字段，逻辑复制就会中断。这个时候，只要在路基复制库中对应表添加相应字段，再把订阅启动起来，就可以了。<br>正确的添加顺序。应该在逻辑库先添加字段。然后再在发布库添加字段。然后看看是否复制正常。复制不正常就先停下复制。再启动复制即可</p>
+</code></pre><h3 id="如果发布表需要增加字段。逻辑复制还能继续吗？"><a href="#如果发布表需要增加字段。逻辑复制还能继续吗？" class="headerlink" title="如果发布表需要增加字段。逻辑复制还能继续吗？"></a>如果发布表需要增加字段。逻辑复制还能继续吗？</h3><p>如果发布表增加了字段。而订阅表没有添加字段，逻辑复制就会中断。这个时候，只要在订阅节点库中对应表添加相应字段，再把订阅启动起来，就可以了。<br>正确的添加顺序。应该在订阅节点库先添加字段。然后再在发布节点库添加字段。然后看看是否复制正常。复制不正常就先停下复制。再启动复制即可</p>
 
       
     </div>
