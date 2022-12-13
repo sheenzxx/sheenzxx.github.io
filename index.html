@@ -301,6 +301,22 @@
 
               <time title="创建时间：2022-11-25 10:41:37" itemprop="dateCreated datePublished" datetime="2022-11-25T10:41:37+08:00">2022-11-25</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-12-13 16:29:58" itemprop="dateModified" datetime="2022-12-13T16:29:58+08:00">2022-12-13</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Shell-Script/" itemprop="url" rel="index"><span itemprop="name">Shell Script</span></a>
+                </span>
+            </span>
 
           
 
@@ -313,7 +329,11 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          
+          <p>有时候发现linux 操作系统的swap 发生了占用。但想知道究竟是被哪些进程占用。<br>这里的一个思路就是通过/proc/${pid}/smaps 文件统计出 对应的swap 占用</p>
+<p>那么我们可以根据ps -ef |grep ${keyword} 过滤出想要查看的进程。然后将进程<br>id 循环查看/proc/${pid}/smaps 就可以得到每个进程的swap 占用</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> pid <span class="keyword">in</span> `ps -ef |grep <span class="variable">$&#123;filterKeyword&#125;</span> |awk <span class="string">&#x27;&#123;print $2&#125;&#x27;</span>`;</span><br><span class="line"><span class="keyword">do</span></span><br><span class="line">   totSwap=$(<span class="built_in">cat</span> /proc/<span class="variable">$&#123;pid&#125;</span>/smaps |grep Swap |awk -v filter=<span class="variable">$&#123;filter&#125;</span> <span class="string">&#x27;BEGIN&#123;tot=0&#125;&#123;tot = tot + $2&#125;END&#123;if(tot &gt; filter)&#123;printf &quot;%sM\n&quot;,tot/1024&#125;&#125;&#x27;</span>)</span><br><span class="line">   [ -z <span class="variable">$&#123;totSwap&#125;</span> ] || <span class="built_in">echo</span> <span class="string">&quot;<span class="variable">$&#123;pid&#125;</span>: <span class="variable">$&#123;totSwap&#125;</span>&quot;</span> &gt;&gt; swap_in_use.log</span><br><span class="line"><span class="keyword">done</span></span><br></pre></td></tr></table></figure>
+<p>工具URL:<br><a target="_blank" rel="noopener" href="https://github.com/sheenzxx/mysqltool/blob/main/PidSwapUse.sh">https://github.com/sheenzxx/mysqltool/blob/main/PidSwapUse.sh</a></p>
+
       
     </div>
 
@@ -1101,13 +1121,13 @@ select * from pg_subscription; #查看订阅信息
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-count">6</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">24</span>
+        <span class="site-state-item-count">26</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

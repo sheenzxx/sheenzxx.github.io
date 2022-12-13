@@ -49,11 +49,25 @@
     <link href="https://sheenzxx.github.io/2022/11/25/MysqlPidSwapUse/"/>
     <id>https://sheenzxx.github.io/2022/11/25/MysqlPidSwapUse/</id>
     <published>2022-11-25T02:41:37.000Z</published>
-    <updated>2022-11-25T02:41:37.272Z</updated>
+    <updated>2022-12-13T08:29:58.693Z</updated>
+    
+    <content type="html"><![CDATA[<p>有时候发现linux 操作系统的swap 发生了占用。但想知道究竟是被哪些进程占用。<br>这里的一个思路就是通过/proc/${pid}/smaps 文件统计出 对应的swap 占用</p><p>那么我们可以根据ps -ef |grep ${keyword} 过滤出想要查看的进程。然后将进程<br>id 循环查看/proc/${pid}/smaps 就可以得到每个进程的swap 占用</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> pid <span class="keyword">in</span> `ps -ef |grep <span class="variable">$&#123;filterKeyword&#125;</span> |awk <span class="string">&#x27;&#123;print $2&#125;&#x27;</span>`;</span><br><span class="line"><span class="keyword">do</span></span><br><span class="line">   totSwap=$(<span class="built_in">cat</span> /proc/<span class="variable">$&#123;pid&#125;</span>/smaps |grep Swap |awk -v filter=<span class="variable">$&#123;filter&#125;</span> <span class="string">&#x27;BEGIN&#123;tot=0&#125;&#123;tot = tot + $2&#125;END&#123;if(tot &gt; filter)&#123;printf &quot;%sM\n&quot;,tot/1024&#125;&#125;&#x27;</span>)</span><br><span class="line">   [ -z <span class="variable">$&#123;totSwap&#125;</span> ] || <span class="built_in">echo</span> <span class="string">&quot;<span class="variable">$&#123;pid&#125;</span>: <span class="variable">$&#123;totSwap&#125;</span>&quot;</span> &gt;&gt; swap_in_use.log</span><br><span class="line"><span class="keyword">done</span></span><br></pre></td></tr></table></figure><p>工具URL:<br><a href="https://github.com/sheenzxx/mysqltool/blob/main/PidSwapUse.sh">https://github.com/sheenzxx/mysqltool/blob/main/PidSwapUse.sh</a></p>]]></content>
+    
+    
+      
+      
+    <summary type="html">&lt;p&gt;有时候发现linux 操作系统的swap 发生了占用。但想知道究竟是被哪些进程占用。&lt;br&gt;这里的一个思路就是通过/proc/${pid}/smaps 文件统计出 对应的swap 占用&lt;/p&gt;
+&lt;p&gt;那么我们可以根据ps -ef |grep ${keyword} 过滤出想要</summary>
+      
     
     
     
+    <category term="Shell Script" scheme="https://sheenzxx.github.io/categories/Shell-Script/"/>
     
+    
+    <category term="swap" scheme="https://sheenzxx.github.io/tags/swap/"/>
+    
+    <category term="linux" scheme="https://sheenzxx.github.io/tags/linux/"/>
     
   </entry>
   
