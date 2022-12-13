@@ -36,11 +36,11 @@
     <category term="TiDB" scheme="https://sheenzxx.github.io/categories/TiDB/"/>
     
     
-    <category term="database" scheme="https://sheenzxx.github.io/tags/database/"/>
-    
     <category term="tidb" scheme="https://sheenzxx.github.io/tags/tidb/"/>
     
     <category term="国产数据库" scheme="https://sheenzxx.github.io/tags/%E5%9B%BD%E4%BA%A7%E6%95%B0%E6%8D%AE%E5%BA%93/"/>
+    
+    <category term="database" scheme="https://sheenzxx.github.io/tags/database/"/>
     
   </entry>
   
