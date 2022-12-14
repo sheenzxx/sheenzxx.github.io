@@ -189,6 +189,81 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://sheenzxx.github.io/2022/12/14/logrotate/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Sheen">
+      <meta itemprop="description" content="数据库相关技术研究,自动化运维">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="sheen's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/12/14/logrotate/" class="post-title-link" itemprop="url">Linux 自带日志切换工具 logrotate</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-12-14 11:28:32 / 修改时间：12:10:33" itemprop="dateCreated datePublished" datetime="2022-12-14T11:28:32+08:00">2022-12-14</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index"><span itemprop="name">Linux</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>很多时候某些工具并没有自带日志轮转功能。当产生日志过多，单个日志文件可能<br>大到几十G对于日志运维比较麻烦，比如nginx。最好的办法就是对文件进行切片。<br>按指定日期进行轮转，后期也有利于日志归档删除。很多人会自己写脚本，在crontab<br>中挂个定时任务，去切换文件。<br>其实在 Linux 中提供了一个logrotate 工具。可以满足这方面的需求，只要配置一下文件。<br>就可以轻松实现各种轮转</p>
+<p>以nginx 为例<br>我们需要在 /etc/logrotate.d/ 下面创建一个配置文件<br>vi </p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">vi /etc/logrotate.d/nginx</span><br><span class="line"></span><br><span class="line">/usr/local/nginx/logs/*.<span class="built_in">log</span> &#123;</span><br><span class="line">         monthly    <span class="comment">## 轮转周期 daily |weekly |monthly |yearly</span></span><br><span class="line">         missingok  <span class="comment">## 在日志轮循期间，任何错误将被忽略，例如“文件无法找到”之类的错误</span></span><br><span class="line">         rotate 7   <span class="comment">## 保留7个归档</span></span><br><span class="line">         minsize 5M <span class="comment">## 只有超过这个最小值才归档</span></span><br><span class="line">         dateext    <span class="comment">## 归档日志文件名 + 当前日期 重命名</span></span><br><span class="line">         compress   <span class="comment">##在轮循任务完成后，已轮循的归档将使用gzip进行压缩</span></span><br><span class="line">         delaycompress <span class="comment">##总是与compress选项一起用，delaycompress选项指示logrotate不要将最近的归档压缩，压缩将在下一次轮循周期进行。这在你或任何软件仍然需要读取最新归档时很有用。</span></span><br><span class="line">         notifempty  <span class="comment">## 如果日志文件为空，轮循不会进行。</span></span><br><span class="line">         create 640 django django <span class="comment">## 新建的日志文件指定权限</span></span><br><span class="line">         sharedscripts  <span class="comment">## 运行postrotate脚本，作用是在所有日志都轮转后统一执行一次脚本。如果没有配置这个，那么每个日志轮转后都会执行一次脚本</span></span><br><span class="line">         postrotate    <span class="comment">##  在所有其它指令完成后，postrotate和endscript里面指定的命令将被执行。在这种情况下，rsyslogd 进程将立即再次读取其配置并继续运行</span></span><br><span class="line">         <span class="keyword">if</span> [ -f /usr/local/nginx/nginx.pid ]; <span class="keyword">then</span></span><br><span class="line">              <span class="built_in">kill</span> -USR1 `<span class="built_in">cat</span> /usr/local/nginx/nginx.pid`  <span class="comment">## 触发nginx 重新加载配置。这样新的日志才会写入新建的文件</span></span><br><span class="line">         <span class="keyword">fi</span></span><br><span class="line">         endscript</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>以上配置了一个nginx 的日志轮转 按月归档。保留7个月</p>
+<p>注意:<br>这些注释在使用时一定要删掉。否则会报错</p>
+<p>可以对没有提供轮转功能的任何应用的日志进行轮转。如果没有提供reload 重载配置文件的<br>应用。则需要重启<br>以下是我对django uwsgi 的日志行进轮转配置</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">vi /etc/logrotate.d/uwsgi</span><br><span class="line">/data/PRG/django/pc_dba_platform/uwsgi.log &#123;</span><br><span class="line">         daily</span><br><span class="line">         missingok</span><br><span class="line">         rotate 30</span><br><span class="line">         minsize 5M</span><br><span class="line">         dateext</span><br><span class="line">         compress</span><br><span class="line">         delaycompress</span><br><span class="line">         notifempty</span><br><span class="line">         create 640 django django</span><br><span class="line">         sharedscripts</span><br><span class="line">         postrotate</span><br><span class="line">         <span class="keyword">if</span> [ -f /data/PRG/django/pc_dba_platform/uwsgi.pid ]; <span class="keyword">then</span></span><br><span class="line">              <span class="comment">## uwsgi --reload 并不做重载配置操作。只是更新python 代码。所以这里用重启服务的方式</span></span><br><span class="line">              /data/PRG/django/pc_dba_platform/django_server.sh stop</span><br><span class="line">              /data/PRG/django/pc_dba_platform/django_server.sh start</span><br><span class="line">         <span class="keyword">fi</span></span><br><span class="line">         endscript</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>强制执行日志轮换<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/usr/sbin/logrotate -f /etc/logrotate.d/uwsgi</span><br></pre></td></tr></table></figure></p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://sheenzxx.github.io/2022/12/07/TiDBSingle/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -941,110 +1016,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://sheenzxx.github.io/2022/10/20/pglogical/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="Sheen">
-      <meta itemprop="description" content="数据库相关技术研究,自动化运维">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="sheen's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/10/20/pglogical/" class="post-title-link" itemprop="url">利用PG 的逻辑复制给阿里云数据搭建IDC 逻辑复制库</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-10-20 10:50:37" itemprop="dateCreated datePublished" datetime="2022-10-20T10:50:37+08:00">2022-10-20</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-10-28 15:21:15" itemprop="dateModified" datetime="2022-10-28T15:21:15+08:00">2022-10-28</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/postgres/" itemprop="url" rel="index"><span itemprop="name">postgres</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>将阿里云RDS 数据同步回IDC 做备库，最佳选择是DTS，当然想省钱的话，我们不妨来做个逻辑复制</p>
-<h4 id="pg-逻辑复制的要求"><a href="#pg-逻辑复制的要求" class="headerlink" title="pg 逻辑复制的要求:"></a>pg 逻辑复制的要求:</h4><pre><code>1.postgresql 10+ 版本
-2.wal_level 设置为 pglogical
-3.max_replication_slots 至少设置为1 
-4.逻辑复制采用发布,订阅模式。即在主库创建发布。在备库创建订阅
-5.目前仅支持 INSERT ,UPDATE , DELETE 操作，11+ 支持 TRUNCATE ,不支持DDL。
-6.被发布表（published table ）。必须都有一个复制标识。默认是表的主键，或者有唯一键 都可以被设置为复制标志。如果没有任何唯一标识可用。则会设置为full,已整列数据作为标志
-7.订阅者连接发布的用户必须具有super 权限，如果具有super 权限。订阅将由pg_dump 转储，如果不具备super 权限则无法在 pg_subscription 中读取订阅信息，订阅将会被跳过。
-8.发布数据库源表必须在订阅库中目标表以同名存在，订阅库目标表可以比发布库源表多字段,但源表字段必须在目标库都存在,对应的字段名也应该相同，不要求顺序相同，字段类型也只需要能够自动转换即可。
-</code></pre><p>下面开始演示<br>由于云库RDS 我们一般都不具有super 权限。我们在创建发布者时，就没办法 create publication xxx for all tables; 只能按表来添加</p>
-<h4 id="1-导出发布端数据表结构（注意这里只复制指定的schema-表）"><a href="#1-导出发布端数据表结构（注意这里只复制指定的schema-表）" class="headerlink" title="1. 导出发布端数据表结构（注意这里只复制指定的schema 表）"></a>1. 导出发布端数据表结构（注意这里只复制指定的schema 表）</h4><pre><code>pg_dump -f publication_db.meta.sql -U publication_db -s publication_db -h xxxx.aliyun.com -p port
-</code></pre><h4 id="2-订阅端导入表"><a href="#2-订阅端导入表" class="headerlink" title="2. 订阅端导入表"></a>2. 订阅端导入表</h4><pre><code>create database publication_db owner xxxx  tablespace xxxx;
-psql -U publication_db -d publication_db &lt; publication_db.meta.sql
-</code></pre><h4 id="3-查看发布端是否具备逻辑复制条件"><a href="#3-查看发布端是否具备逻辑复制条件" class="headerlink" title="3. 查看发布端是否具备逻辑复制条件"></a>3. 查看发布端是否具备逻辑复制条件</h4><pre><code>show wal_level;
-wal_level =logical 
-show max_replication_slots;
-max_replication_slots = 10
-show max_wal_senders;
-max_wal_senders = 10
-</code></pre><p>   按照上述要求，如果不是则进行调整。然后重启数据库（生产环境重启数据库必须与业务协商）</p>
-<h4 id="4-发布端创建发布"><a href="#4-发布端创建发布" class="headerlink" title="4. 发布端创建发布"></a>4. 发布端创建发布</h4><pre><code> create publication publication_db_logical for table xxxx;
- Select * from pg_publication; #查看发布者信息
-</code></pre><h4 id="5-订阅端创建订阅"><a href="#5-订阅端创建订阅" class="headerlink" title="5. 订阅端创建订阅"></a>5. 订阅端创建订阅</h4><pre><code>\c publication_db superUser
-create subscription publication_db_sub connction &#39;host=aliyun.db.domain port=xxx dbname=publication_db user=superUser password=xxxx&#39; publication publication_db_logical;
-##对于pg中无法解析域名，我们可以先ping 下 RDS的域名。以得到真实IP，然后在/etc/hosts 中对应添加 ip  域名
-select * from pg_subscription; #查看订阅信息
-</code></pre><h4 id="6-在发布端查看是否已经启动复制进程"><a href="#6-在发布端查看是否已经启动复制进程" class="headerlink" title="6. 在发布端查看是否已经启动复制进程"></a>6. 在发布端查看是否已经启动复制进程</h4><pre><code>select * from pg_stat_replication;
-</code></pre><h4 id="7-订阅创建成功后"><a href="#7-订阅创建成功后" class="headerlink" title="7. 订阅创建成功后"></a>7. 订阅创建成功后</h4><pre><code>订阅端首先进行的是表数据初始化。即在发布端全量拉取数据过来，完成后再进行增量同步
-</code></pre><h4 id="8-添加余下的表到发布中"><a href="#8-添加余下的表到发布中" class="headerlink" title="8. 添加余下的表到发布中"></a>8. 添加余下的表到发布中</h4><pre><code>alter publication publication_db_logical add table tab1,tab2,tab3....
-</code></pre><h4 id="9-在订阅端刷新订阅"><a href="#9-在订阅端刷新订阅" class="headerlink" title="9. 在订阅端刷新订阅"></a>9. 在订阅端刷新订阅</h4><pre><code>alter subscription mysub refresh publication;  #只有发动刷新。发布端的变动才会同步过来
-</code></pre><h3 id="如果发布表需要增加字段。逻辑复制还能继续吗？"><a href="#如果发布表需要增加字段。逻辑复制还能继续吗？" class="headerlink" title="如果发布表需要增加字段。逻辑复制还能继续吗？"></a>如果发布表需要增加字段。逻辑复制还能继续吗？</h3><p>如果发布表增加了字段。而订阅表没有添加字段，逻辑复制就会中断。这个时候，只要在订阅节点库中对应表添加相应字段，再把订阅启动起来，就可以了。<br>正确的添加顺序。应该在订阅节点库先添加字段。然后再在发布节点库添加字段。然后看看是否复制正常。复制不正常就先停下复制。再启动复制即可</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1114,20 +1085,20 @@ select * from pg_subscription; #查看订阅信息
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">17</span>
+          <span class="site-state-item-count">18</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">6</span>
+        <span class="site-state-item-count">7</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-count">28</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

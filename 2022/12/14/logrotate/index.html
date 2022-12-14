@@ -20,21 +20,21 @@
     var CONFIG = {"hostname":"sheenzxx.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"gitalk","storage":true,"lazyload":false,"nav":null,"activeClass":"gitalk"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="有如下表结构123456789101112CREATE TABLE &#96;user_mapping_v1&#96; (  &#96;id&#96; bigint NOT NULL AUTO_INCREMENT COMMENT &amp;#x27;主键&amp;#x27;,  &#96;site&#96; varchar(255) NOT NULL DEFAULT &amp;#x27;&amp;#x27; COMMENT &amp;#x27;平台&amp;#x27;,  &#96;project&#96;">
+  <meta name="description" content="很多时候某些工具并没有自带日志轮转功能。当产生日志过多，单个日志文件可能大到几十G对于日志运维比较麻烦，比如nginx。最好的办法就是对文件进行切片。按指定日期进行轮转，后期也有利于日志归档删除。很多人会自己写脚本，在crontab中挂个定时任务，去切换文件。其实在 Linux 中提供了一个logrotate 工具。可以满足这方面的需求，只要配置一下文件。就可以轻松实现各种轮转 以nginx 为例">
 <meta property="og:type" content="article">
-<meta property="og:title" content="索引须知:最左原则">
-<meta property="og:url" content="https://sheenzxx.github.io/2022/11/02/sqltuning2/index.html">
+<meta property="og:title" content="Linux 自带日志切换工具 logrotate">
+<meta property="og:url" content="https://sheenzxx.github.io/2022/12/14/logrotate/index.html">
 <meta property="og:site_name" content="sheen&#39;s Blog">
-<meta property="og:description" content="有如下表结构123456789101112CREATE TABLE &#96;user_mapping_v1&#96; (  &#96;id&#96; bigint NOT NULL AUTO_INCREMENT COMMENT &amp;#x27;主键&amp;#x27;,  &#96;site&#96; varchar(255) NOT NULL DEFAULT &amp;#x27;&amp;#x27; COMMENT &amp;#x27;平台&amp;#x27;,  &#96;project&#96;">
+<meta property="og:description" content="很多时候某些工具并没有自带日志轮转功能。当产生日志过多，单个日志文件可能大到几十G对于日志运维比较麻烦，比如nginx。最好的办法就是对文件进行切片。按指定日期进行轮转，后期也有利于日志归档删除。很多人会自己写脚本，在crontab中挂个定时任务，去切换文件。其实在 Linux 中提供了一个logrotate 工具。可以满足这方面的需求，只要配置一下文件。就可以轻松实现各种轮转 以nginx 为例">
 <meta property="og:locale" content="zh_CN">
-<meta property="article:published_time" content="2022-11-02T10:13:11.000Z">
-<meta property="article:modified_time" content="2022-11-02T10:37:19.179Z">
+<meta property="article:published_time" content="2022-12-14T03:28:32.000Z">
+<meta property="article:modified_time" content="2022-12-14T04:10:33.402Z">
 <meta property="article:author" content="Sheen">
-<meta property="article:tag" content="database">
-<meta property="article:tag" content="sqltuning">
+<meta property="article:tag" content="logrotate">
+<meta property="article:tag" content="nginx log rotate">
 <meta name="twitter:card" content="summary">
 
-<link rel="canonical" href="https://sheenzxx.github.io/2022/11/02/sqltuning2/">
+<link rel="canonical" href="https://sheenzxx.github.io/2022/12/14/logrotate/">
 
 
 <script id="page-configurations">
@@ -47,7 +47,7 @@
   };
 </script>
 
-  <title>索引须知:最左原则 | sheen's Blog</title>
+  <title>Linux 自带日志切换工具 logrotate | sheen's Blog</title>
   
 
 
@@ -193,7 +193,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://sheenzxx.github.io/2022/11/02/sqltuning2/">
+    <link itemprop="mainEntityOfPage" href="https://sheenzxx.github.io/2022/12/14/logrotate/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.gif">
@@ -206,7 +206,7 @@
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
-          索引须知:最左原则
+          Linux 自带日志切换工具 logrotate
         </h1>
 
         <div class="post-meta">
@@ -217,7 +217,7 @@
               <span class="post-meta-item-text">发表于</span>
               
 
-              <time title="创建时间：2022-11-02 18:13:11 / 修改时间：18:37:19" itemprop="dateCreated datePublished" datetime="2022-11-02T18:13:11+08:00">2022-11-02</time>
+              <time title="创建时间：2022-12-14 11:28:32 / 修改时间：12:10:33" itemprop="dateCreated datePublished" datetime="2022-12-14T11:28:32+08:00">2022-12-14</time>
             </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -225,7 +225,7 @@
               </span>
               <span class="post-meta-item-text">分类于</span>
                 <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/mysql/" itemprop="url" rel="index"><span itemprop="name">mysql</span></a>
+                  <a href="/categories/Linux/" itemprop="url" rel="index"><span itemprop="name">Linux</span></a>
                 </span>
             </span>
 
@@ -240,7 +240,14 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <p>有如下表结构<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> `user_mapping_v1` (</span><br><span class="line">  `id` <span class="type">bigint</span> <span class="keyword">NOT</span> <span class="keyword">NULL</span> AUTO_INCREMENT COMMENT <span class="string">&#x27;主键&#x27;</span>,</span><br><span class="line">  `site` <span class="type">varchar</span>(<span class="number">255</span>) <span class="keyword">NOT</span> <span class="keyword">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">&#x27;&#x27;</span> COMMENT <span class="string">&#x27;平台&#x27;</span>,</span><br><span class="line">  `project` <span class="type">varchar</span>(<span class="number">64</span>) <span class="keyword">DEFAULT</span> <span class="keyword">NULL</span> COMMENT <span class="string">&#x27;项目&#x27;</span>,</span><br><span class="line">  `distinct_id` <span class="type">varchar</span>(<span class="number">255</span>) <span class="keyword">NOT</span> <span class="keyword">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">&#x27;&#x27;</span> COMMENT <span class="string">&#x27;设备号&#x27;</span>,</span><br><span class="line">  `user_id` <span class="type">bigint</span>(<span class="number">20</span>) <span class="keyword">DEFAULT</span> <span class="keyword">NULL</span> COMMENT <span class="string">&#x27;用户id&#x27;</span>,</span><br><span class="line">  `create_time` datetime <span class="keyword">DEFAULT</span> <span class="built_in">CURRENT_TIMESTAMP</span> COMMENT <span class="string">&#x27;创建时间&#x27;</span>,</span><br><span class="line">  `update_time` datetime <span class="keyword">DEFAULT</span> <span class="built_in">CURRENT_TIMESTAMP</span> COMMENT <span class="string">&#x27;修改时间&#x27;</span>,</span><br><span class="line">  <span class="keyword">PRIMARY</span> KEY (`id`) <span class="keyword">USING</span> BTREE,</span><br><span class="line">  <span class="keyword">UNIQUE</span> KEY `uk_user_mapping` (`site`,`project`,`distinct_id`) <span class="keyword">USING</span> BTREE COMMENT <span class="string">&#x27;用户映射表唯一组合索引&#x27;</span></span><br><span class="line">) ENGINE<span class="operator">=</span>InnoDB <span class="keyword">DEFAULT</span> CHARSET<span class="operator">=</span>utf8</span><br><span class="line"></span><br></pre></td></tr></table></figure><br>使用如下的语句进行检索。可能很多人都会认为会命中unique key.<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span>  id,site,project,distinct_id,user_id,create_time,update_time  <span class="keyword">FROM</span> user_mapping_v1 </span><br><span class="line"><span class="keyword">WHERE</span> distinct_id <span class="operator">=</span> <span class="string">&#x27;B4C2AA7B-95A0-44DF-BFC5-xxxx&#x27;</span> <span class="keyword">AND</span> project <span class="operator">=</span> <span class="string">&#x27;proj&#x27;</span></span><br></pre></td></tr></table></figure><br> 而实际执行时，你会收到意外的执行计划，那就是全表扫描。为什么呢？条件字段有包含在索引字段里面啊。这里就涉及到索引使用<br> 的一个原则问题：最左匹配原则。<br> 数据库通过条件匹配索引是从索引列最左列开始匹配的。那么上面的条件虽然有distinct_id，project 但是并没有site ，所以匹配<br> 不到索引。走了全表扫描。<br> 给它建一个索引<br> <figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> INDEX idx_distinct_project <span class="keyword">ON</span> user_mapping_v1(distinct_id,project)</span><br></pre></td></tr></table></figure><br>这下我们可以看到走的就是新建的这个索引了<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">id	select_type	  <span class="keyword">table</span>	        partitions	type	possible_keys	       key	             key_len	<span class="keyword">ref</span>	      <span class="keyword">rows</span>	filtered	Extra</span><br><span class="line"><span class="number">1</span>	SIMPLE	    user_mapping_v1	  \N	    <span class="keyword">ref</span>	 idx_distinct_project	idx_distinct_project	<span class="number">962</span>	   const,const	<span class="number">1</span>	 <span class="number">100.00</span>	     \N</span><br></pre></td></tr></table></figure><br>在创建索引时,通常要考虑把系统中对该表查下时最常使用的那个字段放在索引的最左边，建组合索引。以达到一个索引能在更多的情况下被使用</p>
+        <p>很多时候某些工具并没有自带日志轮转功能。当产生日志过多，单个日志文件可能<br>大到几十G对于日志运维比较麻烦，比如nginx。最好的办法就是对文件进行切片。<br>按指定日期进行轮转，后期也有利于日志归档删除。很多人会自己写脚本，在crontab<br>中挂个定时任务，去切换文件。<br>其实在 Linux 中提供了一个logrotate 工具。可以满足这方面的需求，只要配置一下文件。<br>就可以轻松实现各种轮转</p>
+<p>以nginx 为例<br>我们需要在 /etc/logrotate.d/ 下面创建一个配置文件<br>vi </p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">vi /etc/logrotate.d/nginx</span><br><span class="line"></span><br><span class="line">/usr/local/nginx/logs/*.<span class="built_in">log</span> &#123;</span><br><span class="line">         monthly    <span class="comment">## 轮转周期 daily |weekly |monthly |yearly</span></span><br><span class="line">         missingok  <span class="comment">## 在日志轮循期间，任何错误将被忽略，例如“文件无法找到”之类的错误</span></span><br><span class="line">         rotate 7   <span class="comment">## 保留7个归档</span></span><br><span class="line">         minsize 5M <span class="comment">## 只有超过这个最小值才归档</span></span><br><span class="line">         dateext    <span class="comment">## 归档日志文件名 + 当前日期 重命名</span></span><br><span class="line">         compress   <span class="comment">##在轮循任务完成后，已轮循的归档将使用gzip进行压缩</span></span><br><span class="line">         delaycompress <span class="comment">##总是与compress选项一起用，delaycompress选项指示logrotate不要将最近的归档压缩，压缩将在下一次轮循周期进行。这在你或任何软件仍然需要读取最新归档时很有用。</span></span><br><span class="line">         notifempty  <span class="comment">## 如果日志文件为空，轮循不会进行。</span></span><br><span class="line">         create 640 django django <span class="comment">## 新建的日志文件指定权限</span></span><br><span class="line">         sharedscripts  <span class="comment">## 运行postrotate脚本，作用是在所有日志都轮转后统一执行一次脚本。如果没有配置这个，那么每个日志轮转后都会执行一次脚本</span></span><br><span class="line">         postrotate    <span class="comment">##  在所有其它指令完成后，postrotate和endscript里面指定的命令将被执行。在这种情况下，rsyslogd 进程将立即再次读取其配置并继续运行</span></span><br><span class="line">         <span class="keyword">if</span> [ -f /usr/local/nginx/nginx.pid ]; <span class="keyword">then</span></span><br><span class="line">              <span class="built_in">kill</span> -USR1 `<span class="built_in">cat</span> /usr/local/nginx/nginx.pid`  <span class="comment">## 触发nginx 重新加载配置。这样新的日志才会写入新建的文件</span></span><br><span class="line">         <span class="keyword">fi</span></span><br><span class="line">         endscript</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>以上配置了一个nginx 的日志轮转 按月归档。保留7个月</p>
+<p>注意:<br>这些注释在使用时一定要删掉。否则会报错</p>
+<p>可以对没有提供轮转功能的任何应用的日志进行轮转。如果没有提供reload 重载配置文件的<br>应用。则需要重启<br>以下是我对django uwsgi 的日志行进轮转配置</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">vi /etc/logrotate.d/uwsgi</span><br><span class="line">/data/PRG/django/pc_dba_platform/uwsgi.log &#123;</span><br><span class="line">         daily</span><br><span class="line">         missingok</span><br><span class="line">         rotate 30</span><br><span class="line">         minsize 5M</span><br><span class="line">         dateext</span><br><span class="line">         compress</span><br><span class="line">         delaycompress</span><br><span class="line">         notifempty</span><br><span class="line">         create 640 django django</span><br><span class="line">         sharedscripts</span><br><span class="line">         postrotate</span><br><span class="line">         <span class="keyword">if</span> [ -f /data/PRG/django/pc_dba_platform/uwsgi.pid ]; <span class="keyword">then</span></span><br><span class="line">              <span class="comment">## uwsgi --reload 并不做重载配置操作。只是更新python 代码。所以这里用重启服务的方式</span></span><br><span class="line">              /data/PRG/django/pc_dba_platform/django_server.sh stop</span><br><span class="line">              /data/PRG/django/pc_dba_platform/django_server.sh start</span><br><span class="line">         <span class="keyword">fi</span></span><br><span class="line">         endscript</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>强制执行日志轮换<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/usr/sbin/logrotate -f /etc/logrotate.d/uwsgi</span><br></pre></td></tr></table></figure></p>
 
     </div>
 
@@ -250,8 +257,8 @@
 
       <footer class="post-footer">
           <div class="post-tags">
-              <a href="/tags/database/" rel="tag"># database</a>
-              <a href="/tags/sqltuning/" rel="tag"># sqltuning</a>
+              <a href="/tags/logrotate/" rel="tag"># logrotate</a>
+              <a href="/tags/nginx-log-rotate/" rel="tag"># nginx log rotate</a>
           </div>
 
         
@@ -260,13 +267,10 @@
         
     <div class="post-nav">
       <div class="post-nav-item">
-    <a href="/2022/11/01/oldestxmin/" rel="prev" title="日志报错:oldest xmin is far in the past">
-      <i class="fa fa-chevron-left"></i> 日志报错:oldest xmin is far in the past
+    <a href="/2022/12/07/TiDBSingle/" rel="prev" title="虚拟机安装TiDB单机版">
+      <i class="fa fa-chevron-left"></i> 虚拟机安装TiDB单机版
     </a></div>
-      <div class="post-nav-item">
-    <a href="/2022/11/08/mysqlPlugIn/" rel="next" title="MySql 插件安装">
-      MySql 插件安装 <i class="fa fa-chevron-right"></i>
-    </a></div>
+      <div class="post-nav-item"></div>
     </div>
       </footer>
     
@@ -517,7 +521,7 @@ NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
       repo        : 'sheenzxx.github.io',
       owner       : 'sheenzxx',
       admin       : ['sheenzxx'],
-      id          : 'e5853866d16c4b70a0d40a0f18e6b671',
+      id          : '31afa3dae76761ab0452b899bd05641f',
         language: 'zh-CN',
       distractionFreeMode: true
     });
