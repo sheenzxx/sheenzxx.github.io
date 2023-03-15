@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"sheenzxx.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"gitalk","storage":true,"lazyload":false,"nav":null,"activeClass":"gitalk"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="一 规划：本次搭建采用3个服务器搭建一个 3分片2副本的clickhouse 集群。命名规则中。以S 代表分片。R代表复制集。集群架构如下图 172.28.160.2 上面存放2个实例分别为 S1R1(分片1复制集1)实例， S2R2(分片2复制集2)实例172.28.160.3 上面存放2个实例分别为 S2R1(分片2复制集1)实例， S3R2(分片3复制集2)实例172.28.160.4 上面">
+<meta property="og:type" content="article">
+<meta property="og:title" content="搭建clichouse 集群">
+<meta property="og:url" content="https://sheenzxx.github.io/2023/01/29/buildClickHouseCluster/index.html">
+<meta property="og:site_name" content="sheen&#39;s Blog">
+<meta property="og:description" content="一 规划：本次搭建采用3个服务器搭建一个 3分片2副本的clickhouse 集群。命名规则中。以S 代表分片。R代表复制集。集群架构如下图 172.28.160.2 上面存放2个实例分别为 S1R1(分片1复制集1)实例， S2R2(分片2复制集2)实例172.28.160.3 上面存放2个实例分别为 S2R1(分片2复制集1)实例， S3R2(分片3复制集2)实例172.28.160.4 上面">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://sheenzxx.github.io/2023/01/29/buildClickHouseCluster/images/clickhouse.png">
+<meta property="og:image" content="https://sheenzxx.github.io/2023/01/29/buildClickHouseCluster/images/c1t1.png">
+<meta property="og:image" content="https://sheenzxx.github.io/2023/01/29/buildClickHouseCluster/images/c2t2.png">
+<meta property="og:image" content="https://sheenzxx.github.io/2023/01/29/buildClickHouseCluster/images/c3t3.png">
+<meta property="article:published_time" content="2023-01-29T06:46:22.000Z">
+<meta property="article:modified_time" content="2023-01-29T07:37:57.910Z">
+<meta property="article:author" content="Sheen">
+<meta property="article:tag" content="cluster">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://sheenzxx.github.io/2023/01/29/buildClickHouseCluster/images/clickhouse.png">
+
+<link rel="canonical" href="https://sheenzxx.github.io/2023/01/29/buildClickHouseCluster/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>搭建clichouse 集群 | sheen's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="sheen's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">sheen's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">随笔，技术笔记</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/home/" rel="section"><i class="home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://sheenzxx.github.io/2023/01/29/buildClickHouseCluster/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Sheen">
+      <meta itemprop="description" content="数据库相关技术研究,自动化运维">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="sheen's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          搭建clichouse 集群
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2023-01-29 14:46:22 / 修改时间：15:37:57" itemprop="dateCreated datePublished" datetime="2023-01-29T14:46:22+08:00">2023-01-29</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/clickhouse/" itemprop="url" rel="index"><span itemprop="name">clickhouse</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h4 id="一-规划："><a href="#一-规划：" class="headerlink" title="一 规划："></a>一 规划：</h4><p>本次搭建采用3个服务器搭建一个 3分片2副本的clickhouse 集群。命名规则中。以S 代表分片。R代表复制集。集群架构如下图<br><img src="images/clickhouse.png" alt="cka"></p>
+<p>172.28.160.2 上面存放2个实例分别为 S1R1(分片1复制集1)实例， S2R2(分片2复制集2)实例<br>172.28.160.3 上面存放2个实例分别为 S2R1(分片2复制集1)实例， S3R2(分片3复制集2)实例<br>172.28.160.4 上面存放2个实例分别为 S3R1(分片3复制集1)实例， S3R2(分片1复制集2)实例</p>
+<p>以确保在宕机任何一个节点。都不会影响集群的正常使用<br>同时在三个节点上启动clickhouse-keeper ，用于分布式集群通讯。（旧版本中用zookeeper）</p>
+<p>主机实例分布<br><img src="images/c1t1.png" alt="c1t1"><br><img src="images/c2t2.png" alt="c2t2"><br><img src="images/c3t3.png" alt="c3t3"></p>
+<h4 id="二-安装"><a href="#二-安装" class="headerlink" title="二 安装"></a>二 安装</h4><h5 id="1-下载-clickhouse-稳定版本地址-：https-packages-clickhouse-com-rpm-stable"><a href="#1-下载-clickhouse-稳定版本地址-：https-packages-clickhouse-com-rpm-stable" class="headerlink" title="1. 下载 clickhouse 稳定版本地址 ：https://packages.clickhouse.com/rpm/stable/"></a>1. 下载 clickhouse 稳定版本地址 ：<a target="_blank" rel="noopener" href="https://packages.clickhouse.com/rpm/stable/">https://packages.clickhouse.com/rpm/stable/</a></h5><p>本次安装采用RPM 安装，使用版本 22.12.3.5<br>需下载的rpm 包有<br>clickhouse-common-static-22.12.3.5.x86_64.rpm<br>clickhouse-server-22.12.3.5.x86_64.rpm<br>clickhouse-client-22.12.3.5.x86_64.rpm</p>
+<h5 id="2-安装前检测以及优化系统项配置"><a href="#2-安装前检测以及优化系统项配置" class="headerlink" title="2. 安装前检测以及优化系统项配置"></a>2. 安装前检测以及优化系统项配置</h5><p>检查当前CPU是否支持SSE 4.2的命令<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">grep -q sse4_2 /proc/cpuinfo &amp;&amp; echo &quot;SSE 4.2 supported&quot; || echo &quot;SSE 4.2 not supported&quot;</span><br></pre></td></tr></table></figure><br>设置内存分配策略为：0<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">echo 0 |tee /proc/sys/vm/overcommit_memory</span><br></pre></td></tr></table></figure><br>禁用透明大页<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">echo &quot;never&quot; |tee /sys/kernel/mm/transparent_hugepage/enabled</span><br></pre></td></tr></table></figure><br>/etc/hosts 添加集群主机名IP地址映射<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">172.28.160.2 ct-bigdata-clickhouse-160-2</span><br><span class="line">172.28.160.3 ct-bigdata-clickhouse-160-3</span><br><span class="line">172.28.160.4 ct-bigdata-clickhouse-160-4</span><br></pre></td></tr></table></figure></p>
+<h5 id="3-按顺序安装RPM-包"><a href="#3-按顺序安装RPM-包" class="headerlink" title="3. 按顺序安装RPM 包"></a>3. 按顺序安装RPM 包</h5><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br></pre></td><td class="code"><pre><span class="line">[root@ct-bigdata-clickhouse-160-2 clickhouseSoft]# rpm -ivh clickhouse-common-static-22.12.3.5.x86_64.rpm</span><br><span class="line">Preparing... ################################# [100%]</span><br><span class="line">Updating / installing...</span><br><span class="line">      1:clickhouse-common-static-0:22.12.################################# [100%]</span><br><span class="line"></span><br><span class="line">安装clickhouse-server 中间提升需要设置default 密码。输入设置即可。会在 /etc/clickhouse-server/users.d/default-password.xml 保存这个密码     </span><br><span class="line"></span><br><span class="line">[root@ct-bigdata-clickhouse-160-2 clickhouseSoft]# rpm -ivh clickhouse-server-22.12.3.5.x86_64.rpm</span><br><span class="line">Preparing... ################################# [100%]</span><br><span class="line">Updating / installing...</span><br><span class="line">1:clickhouse-server-0:22.12.3.5-1 ################################# [100%]</span><br><span class="line">ClickHouse binary is already located at /usr/bin/clickhouse</span><br><span class="line">Symlink /usr/bin/clickhouse-server already exists but it points to /clickhouse. Will replace the old symlink to /usr/bin/clickhouse.</span><br><span class="line">Creating symlink /usr/bin/clickhouse-server to /usr/bin/clickhouse.</span><br><span class="line">Creating symlink /usr/bin/clickhouse-client to /usr/bin/clickhouse.</span><br><span class="line">Creating symlink /usr/bin/clickhouse-local to /usr/bin/clickhouse.</span><br><span class="line">Creating symlink /usr/bin/clickhouse-benchmark to /usr/bin/clickhouse.</span><br><span class="line">Symlink /usr/bin/clickhouse-copier already exists but it points to /clickhouse. Will replace the old symlink to /usr/bin/clickhouse.</span><br><span class="line">Creating symlink /usr/bin/clickhouse-copier to /usr/bin/clickhouse.</span><br><span class="line">Creating symlink /usr/bin/clickhouse-obfuscator to /usr/bin/clickhouse.</span><br><span class="line">Creating symlink /usr/bin/clickhouse-git-import to /usr/bin/clickhouse.</span><br><span class="line">Creating symlink /usr/bin/clickhouse-compressor to /usr/bin/clickhouse.</span><br><span class="line">Creating symlink /usr/bin/clickhouse-format to /usr/bin/clickhouse.</span><br><span class="line">Symlink /usr/bin/clickhouse-extract-from-config already exists but it points to /clickhouse. Will replace the old symlink to /usr/bin/clickhouse.</span><br><span class="line">Creating symlink /usr/bin/clickhouse-extract-from-config to /usr/bin/clickhouse.</span><br><span class="line">Symlink /usr/bin/clickhouse-keeper already exists but it points to /clickhouse. Will replace the old symlink to /usr/bin/clickhouse.</span><br><span class="line">Creating symlink /usr/bin/clickhouse-keeper to /usr/bin/clickhouse.</span><br><span class="line">Creating symlink /usr/bin/clickhouse-keeper-converter to /usr/bin/clickhouse.</span><br><span class="line">Creating symlink /usr/bin/clickhouse-disks to /usr/bin/clickhouse.</span><br><span class="line">Creating clickhouse group if it does not exist.</span><br><span class="line">groupadd -r clickhouse</span><br><span class="line">Creating clickhouse user if it does not exist.</span><br><span class="line">useradd -r --shell /bin/false --home-dir /nonexistent -g clickhouse clickhouse</span><br><span class="line">Will set ulimits for clickhouse user in /etc/security/limits.d/clickhouse.conf.</span><br><span class="line">Creating config directory /etc/clickhouse-server/config.d that is used for tweaks of main server configuration.</span><br><span class="line">Creating config directory /etc/clickhouse-server/users.d that is used for tweaks of users configuration.</span><br><span class="line">Config file /etc/clickhouse-server/config.xml already exists, will keep it and extract path info from it.</span><br><span class="line">/etc/clickhouse-server/config.xml has /var/lib/clickhouse/ as data path.</span><br><span class="line">/etc/clickhouse-server/config.xml has /var/log/clickhouse-server/ as log path.</span><br><span class="line">Users config file /etc/clickhouse-server/users.xml already exists, will keep it and extract users info from it.</span><br><span class="line">Creating log directory /var/log/clickhouse-server/.</span><br><span class="line">Creating data directory /var/lib/clickhouse/.</span><br><span class="line">Creating pid directory /var/run/clickhouse-server.</span><br><span class="line">chown -R clickhouse:clickhouse &#x27;/var/log/clickhouse-server/&#x27;</span><br><span class="line">chown -R clickhouse:clickhouse &#x27;/var/run/clickhouse-server&#x27;</span><br><span class="line">chown clickhouse:clickhouse &#x27;/var/lib/clickhouse/&#x27;</span><br><span class="line">groupadd -r clickhouse-bridge</span><br><span class="line">useradd -r --shell /bin/false --home-dir /nonexistent -g clickhouse-bridge clickhouse-bridge</span><br><span class="line">chown -R clickhouse-bridge:clickhouse-bridge &#x27;/usr/bin/clickhouse-odbc-bridge&#x27;</span><br><span class="line">chown -R clickhouse-bridge:clickhouse-bridge &#x27;/usr/bin/clickhouse-library-bridge&#x27;</span><br><span class="line">Enter password for default user:</span><br><span class="line">Password for default user is saved in file /etc/clickhouse-server/users.d/default-password.xml.</span><br><span class="line">Setting capabilities for clickhouse binary. This is optional.</span><br><span class="line">Cannot set &#x27;net_admin&#x27; or &#x27;ipc_lock&#x27; or &#x27;sys_nice&#x27; or &#x27;net_bind_service&#x27; capability for clickhouse binary. This is optional. Taskstats accounting will be disabled. To enable taskstats accounting you may add the required capability later manually.</span><br><span class="line">chown -R clickhouse:clickhouse &#x27;/etc/clickhouse-server&#x27;</span><br><span class="line"></span><br><span class="line">ClickHouse has been successfully installed.</span><br><span class="line"></span><br><span class="line">Start clickhouse-server with:</span><br><span class="line">sudo clickhouse start</span><br><span class="line"></span><br><span class="line">Start clickhouse-client with:</span><br><span class="line">clickhouse-client --password</span><br><span class="line"></span><br><span class="line">Created symlink from /etc/systemd/system/multi-user.target.wants/clickhouse-server.service to /usr/lib/systemd/system/clickhouse-server.service.</span><br><span class="line"></span><br><span class="line">[root@ct-bigdata-clickhouse-160-2 clickhouseSoft]# rpm -ivh clickhouse-client-22.12.3.5.x86_64.rpm</span><br><span class="line">Preparing... ################################# [100%]</span><br><span class="line">Updating / installing...</span><br><span class="line">1:clickhouse-client-0:22.12.3.5-1 ################################# [100%]</span><br></pre></td></tr></table></figure>
+<p>安装完这3个rpm 包同时也包含clickhouse-keeper 不需要额外安装,以上步骤均在各个节点上执行</p>
+<h5 id="4-设置目录"><a href="#4-设置目录" class="headerlink" title="4. 设置目录"></a>4. 设置目录</h5><p>在 172.28.160.2 节点上<br>设置实例存储目录<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">mkdir -p /data1/clickhouse/s1r1</span><br><span class="line">mkdir -p /data2/clickhouse/s2r2</span><br><span class="line">chown -R clickhouse:clickhouse /data1/clickhouse</span><br><span class="line">chown -R clickhouse:clickhouse /data2/clickhouse</span><br><span class="line">cd /var/lib/clickhouse/</span><br><span class="line">ln -s /data1/clickhouse/s1r1 s1r1</span><br><span class="line">ln -s /data2/clickhouse/s2r2 s2r2</span><br></pre></td></tr></table></figure><br>设置各个实例日志目录<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">mkdir -p /var/log/clickhouse-server/&#123;s1r1,s2r2&#125;</span><br><span class="line">chown -R clickhouse:clickhouse /var/log/clickhouse-server</span><br></pre></td></tr></table></figure><br>设置clickhouse-keeper 存储目录<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">mkdir -p /var/lib/clickhouse/keeper/coordination</span><br><span class="line">mkdir -p /var/log/clickhouse-keeper</span><br><span class="line">chown -R clickhouse:clickhouse /var/lib/clickhouse/keeper</span><br><span class="line">chown -R clickhouse:clickhouse /var/log/clickhouse-keeper</span><br></pre></td></tr></table></figure><br>在172.28.160.3 节点上<br>设置实例存储目录<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">mkdir -p /data1/clickhouse/s2r1</span><br><span class="line">mkdir -p /data2/clickhouse/s3r2</span><br><span class="line">chown -R clickhouse:clickhouse /data1/clickhouse</span><br><span class="line">chown -R clickhouse:clickhouse /data2/clickhouse</span><br><span class="line">ln -s /data1/clickhouse/s2r1 s2r1</span><br><span class="line">ln -s /data2/clickhouse/s3r2 s3r2</span><br></pre></td></tr></table></figure><br>设置各个实例日志目录<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">mkdir -p /var/log/clickhouse-server/&#123;s2r1,s3r2&#125;</span><br><span class="line">chown -R clickhouse:clickhouse /var/log/clickhouse-server</span><br></pre></td></tr></table></figure><br>设置clickhouse-keeper 存储目录<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">mkdir -p /var/lib/clickhouse/keeper/coordination</span><br><span class="line">mkdir -p /var/log/clickhouse-keeper</span><br><span class="line">chown -R clickhouse:clickhouse /var/lib/clickhouse/keeper</span><br><span class="line">chown -R clickhouse:clickhouse /var/log/clickhouse-keeper</span><br></pre></td></tr></table></figure><br>在172.28.160.4 节点上<br>设置实例存储目录<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">mkdir -p /data1/clickhouse/s3r1</span><br><span class="line">mkdir -p /data2/clickhouse/s1r2</span><br><span class="line">chown -R clickhouse:clickhouse /data1/clickhouse</span><br><span class="line">chown -R clickhouse:clickhouse /data2/clickhouse</span><br><span class="line">ln -s /data1/clickhouse/s3r1 s3r1</span><br><span class="line">ln -s /data2/clickhouse/s1r2 s1r2</span><br></pre></td></tr></table></figure><br>设置各个实例日志目录<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">mkdir -p /var/log/clickhouse-server/&#123;s3r1,s1r2&#125;</span><br><span class="line">chown -R clickhouse:clickhouse /var/log/clickhouse-server</span><br></pre></td></tr></table></figure><br>设置clickhouse-keeper 存储目录<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">mkdir -p /var/lib/clickhouse/keeper/coordination</span><br><span class="line">mkdir -p /var/log/clickhouse-keeper</span><br><span class="line">chown -R clickhouse:clickhouse /var/lib/clickhouse/keeper</span><br><span class="line">chown -R clickhouse:clickhouse /var/log/clickhouse-keeper</span><br></pre></td></tr></table></figure></p>
+<h5 id="5-设置配置文件"><a href="#5-设置配置文件" class="headerlink" title="5. 设置配置文件"></a>5. 设置配置文件</h5><p>在172.28.160.2 上<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">cd /etc/clickhouse-server/</span><br><span class="line">cp config.xml config_s1r1.xml </span><br></pre></td></tr></table></figure><br>在config_s1r1.xml  中 将以下参数替换成如下参数,将路径指向我们定义好的路径</p>
+<p>日志部分 设置waring 级别，并将错误日志，日志指向 s1r1<br><figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">level</span>&gt;</span>warning<span class="tag">&lt;/<span class="name">level</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">log</span>&gt;</span>/var/log/clickhouse-server/s1r1/clickhouse-server.log<span class="tag">&lt;/<span class="name">log</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">errorlog</span>&gt;</span>/var/log/clickhouse-server/s1r1/clickhouse-server.err.log<span class="tag">&lt;/<span class="name">errorlog</span>&gt;</span></span><br></pre></td></tr></table></figure><br>设置数据文件存放路径<br><figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">path</span>&gt;</span>/var/lib/clickhouse/s1r1<span class="tag">&lt;/<span class="name">path</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">tmp_path</span>&gt;</span>/var/lib/clickhouse/s1r1/tmp/<span class="tag">&lt;/<span class="name">tmp_path</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">user_files_path</span>&gt;</span>/var/lib/clickhouse/s1r1/user_files/<span class="tag">&lt;/<span class="name">user_files_path</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">user_directories</span>&gt;</span></span><br><span class="line">       <span class="tag">&lt;<span class="name">local_directory</span>&gt;</span></span><br><span class="line">              <span class="tag">&lt;<span class="name">path</span>&gt;</span>/var/lib/clickhouse/s1r1/access/<span class="tag">&lt;/<span class="name">path</span>&gt;</span></span><br><span class="line">       <span class="tag">&lt;/<span class="name">local_directory</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">user_directories</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="comment">&lt;!-- 宏定义，表示分片1 副本 1 用于分布式表--&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">macros</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">shard</span>&gt;</span>01<span class="tag">&lt;/<span class="name">shard</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">replica</span>&gt;</span>01-1<span class="tag">&lt;/<span class="name">replica</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">macros</span>&gt;</span></span><br></pre></td></tr></table></figure><br>设置集群信息，在remote_servers 表签下，将原有的信息删除，仅保留 <remote_servers></remote_servers>,并添加信息如下</p>
+<p>设置一个3分片2副本集群 <three_shards_tow_replicated> 表示集群名称  <shard> </shard> 表示分片，<shard> 中的 <replica> 表示 分片中的的副本信息<br><figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">remote_servers</span>&gt;</span></span><br><span class="line"></span><br><span class="line">         <span class="tag">&lt;<span class="name">three_shards_tow_replicated</span>&gt;</span></span><br><span class="line">                  <span class="tag">&lt;<span class="name">shard</span>&gt;</span></span><br><span class="line">                             <span class="tag">&lt;<span class="name">internal_replication</span>&gt;</span>true<span class="tag">&lt;/<span class="name">internal_replication</span>&gt;</span></span><br><span class="line">                             <span class="tag">&lt;<span class="name">replica</span>&gt;</span></span><br><span class="line">                                      <span class="tag">&lt;<span class="name">host</span>&gt;</span>172.28.160.2<span class="tag">&lt;/<span class="name">host</span>&gt;</span></span><br><span class="line">                                      <span class="tag">&lt;<span class="name">port</span>&gt;</span>9000<span class="tag">&lt;/<span class="name">port</span>&gt;</span></span><br><span class="line">                                      <span class="tag">&lt;<span class="name">user</span>&gt;</span>repl<span class="tag">&lt;/<span class="name">user</span>&gt;</span></span><br><span class="line">                                      <span class="tag">&lt;<span class="name">password</span>&gt;</span>PLAINPASSWORD<span class="tag">&lt;/<span class="name">password</span>&gt;</span></span><br><span class="line">                             <span class="tag">&lt;/<span class="name">replica</span>&gt;</span></span><br><span class="line">                             <span class="tag">&lt;<span class="name">replica</span>&gt;</span></span><br><span class="line">                                     <span class="tag">&lt;<span class="name">host</span>&gt;</span>172.28.160.4<span class="tag">&lt;/<span class="name">host</span>&gt;</span></span><br><span class="line">                                     <span class="tag">&lt;<span class="name">port</span>&gt;</span>9001<span class="tag">&lt;/<span class="name">port</span>&gt;</span></span><br><span class="line">                                     <span class="tag">&lt;<span class="name">user</span>&gt;</span>repl<span class="tag">&lt;/<span class="name">user</span>&gt;</span></span><br><span class="line">                                     <span class="tag">&lt;<span class="name">password</span>&gt;</span>PLAINPASSWORD<span class="tag">&lt;/<span class="name">password</span>&gt;</span></span><br><span class="line">                            <span class="tag">&lt;/<span class="name">replica</span>&gt;</span></span><br><span class="line">                <span class="tag">&lt;/<span class="name">shard</span>&gt;</span></span><br><span class="line">                <span class="tag">&lt;<span class="name">shard</span>&gt;</span></span><br><span class="line">                        <span class="tag">&lt;<span class="name">internal_replication</span>&gt;</span>true<span class="tag">&lt;/<span class="name">internal_replication</span>&gt;</span></span><br><span class="line">                        <span class="tag">&lt;<span class="name">replica</span>&gt;</span></span><br><span class="line">                                  <span class="tag">&lt;<span class="name">host</span>&gt;</span>172.28.160.3<span class="tag">&lt;/<span class="name">host</span>&gt;</span></span><br><span class="line">                                  <span class="tag">&lt;<span class="name">port</span>&gt;</span>9000<span class="tag">&lt;/<span class="name">port</span>&gt;</span></span><br><span class="line">                                  <span class="tag">&lt;<span class="name">user</span>&gt;</span>repl<span class="tag">&lt;/<span class="name">user</span>&gt;</span></span><br><span class="line">                                  <span class="tag">&lt;<span class="name">password</span>&gt;</span>PLAINPASSWORD<span class="tag">&lt;/<span class="name">password</span>&gt;</span></span><br><span class="line">                       <span class="tag">&lt;/<span class="name">replica</span>&gt;</span></span><br><span class="line">                       <span class="tag">&lt;<span class="name">replica</span>&gt;</span></span><br><span class="line">                                 <span class="tag">&lt;<span class="name">host</span>&gt;</span>172.28.160.2<span class="tag">&lt;/<span class="name">host</span>&gt;</span></span><br><span class="line">                                 <span class="tag">&lt;<span class="name">port</span>&gt;</span>9001<span class="tag">&lt;/<span class="name">port</span>&gt;</span></span><br><span class="line">                                 <span class="tag">&lt;<span class="name">user</span>&gt;</span>repl<span class="tag">&lt;/<span class="name">user</span>&gt;</span></span><br><span class="line">                                 <span class="tag">&lt;<span class="name">password</span>&gt;</span>PLAINPASSWORD<span class="tag">&lt;/<span class="name">password</span>&gt;</span></span><br><span class="line">                      <span class="tag">&lt;/<span class="name">replica</span>&gt;</span></span><br><span class="line">             <span class="tag">&lt;/<span class="name">shard</span>&gt;</span></span><br><span class="line">             <span class="tag">&lt;<span class="name">shard</span>&gt;</span></span><br><span class="line">                      <span class="tag">&lt;<span class="name">internal_replication</span>&gt;</span>true<span class="tag">&lt;/<span class="name">internal_replication</span>&gt;</span></span><br><span class="line">                      <span class="tag">&lt;<span class="name">replica</span>&gt;</span></span><br><span class="line">                              <span class="tag">&lt;<span class="name">host</span>&gt;</span>172.28.160.4<span class="tag">&lt;/<span class="name">host</span>&gt;</span></span><br><span class="line">                              <span class="tag">&lt;<span class="name">port</span>&gt;</span>9000<span class="tag">&lt;/<span class="name">port</span>&gt;</span></span><br><span class="line">                              <span class="tag">&lt;<span class="name">user</span>&gt;</span>repl<span class="tag">&lt;/<span class="name">user</span>&gt;</span></span><br><span class="line">                              <span class="tag">&lt;<span class="name">password</span>&gt;</span>PLAINPASSWORD<span class="tag">&lt;/<span class="name">password</span>&gt;</span></span><br><span class="line">                      <span class="tag">&lt;/<span class="name">replica</span>&gt;</span></span><br><span class="line">                      <span class="tag">&lt;<span class="name">replica</span>&gt;</span></span><br><span class="line">                                <span class="tag">&lt;<span class="name">host</span>&gt;</span>172.28.160.3<span class="tag">&lt;/<span class="name">host</span>&gt;</span></span><br><span class="line">                                <span class="tag">&lt;<span class="name">port</span>&gt;</span>9001<span class="tag">&lt;/<span class="name">port</span>&gt;</span></span><br><span class="line">                                <span class="tag">&lt;<span class="name">user</span>&gt;</span>repl<span class="tag">&lt;/<span class="name">user</span>&gt;</span></span><br><span class="line">                                <span class="tag">&lt;<span class="name">password</span>&gt;</span>PLAINPASSWORD<span class="tag">&lt;/<span class="name">password</span>&gt;</span></span><br><span class="line">                      <span class="tag">&lt;/<span class="name">replica</span>&gt;</span></span><br><span class="line">             <span class="tag">&lt;/<span class="name">shard</span>&gt;</span></span><br><span class="line">       <span class="tag">&lt;/<span class="name">three_shards_tow_replicated</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;/<span class="name">remote_servers</span>&gt;</span></span><br></pre></td></tr></table></figure><br>打开zookeeper 配置信息<br><figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">zookeeper</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">node</span>&gt;</span></span><br><span class="line">                  <span class="tag">&lt;<span class="name">host</span>&gt;</span>172.28.160.2<span class="tag">&lt;/<span class="name">host</span>&gt;</span></span><br><span class="line">                  <span class="tag">&lt;<span class="name">port</span>&gt;</span>2181<span class="tag">&lt;/<span class="name">port</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;/<span class="name">node</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">node</span>&gt;</span></span><br><span class="line">                 <span class="tag">&lt;<span class="name">host</span>&gt;</span>172.28.160.3<span class="tag">&lt;/<span class="name">host</span>&gt;</span></span><br><span class="line">                 <span class="tag">&lt;<span class="name">port</span>&gt;</span>2181<span class="tag">&lt;/<span class="name">port</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;/<span class="name">node</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">node</span>&gt;</span></span><br><span class="line">                  <span class="tag">&lt;<span class="name">host</span>&gt;</span>172.28.160.4<span class="tag">&lt;/<span class="name">host</span>&gt;</span></span><br><span class="line">                  <span class="tag">&lt;<span class="name">port</span>&gt;</span>2181<span class="tag">&lt;/<span class="name">port</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;/<span class="name">node</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">zookeeper</span>&gt;</span></span><br></pre></td></tr></table></figure><br>设置好config 配置文件后，将其拷贝一份</p>
+<p>cp config_s1r1.xml config_s2r2.xml</p>
+<p>修改config_s2r2.xml如下</p>
+<p>将其中涉及路径 s1r1 全部替换为 s2r2</p>
+<p>端口部分修改为如下对应<br><figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">http_port</span>&gt;</span>8124<span class="tag">&lt;/<span class="name">http_port</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">tcp_port</span>&gt;</span>9001<span class="tag">&lt;/<span class="name">tcp_port</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">mysql_port</span>&gt;</span>9014<span class="tag">&lt;/<span class="name">mysql_port</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">postgresql_port</span>&gt;</span>9015<span class="tag">&lt;/<span class="name">postgresql_port</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">interserver_http_port</span>&gt;</span>9019<span class="tag">&lt;/<span class="name">interserver_http_port</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="comment">&lt;!-- 宏定义部分 --&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">macros</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">shard</span>&gt;</span>02<span class="tag">&lt;/<span class="name">shard</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">replica</span>&gt;</span>02-2<span class="tag">&lt;/<span class="name">replica</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">macros</span>&gt;</span></span><br></pre></td></tr></table></figure></p>
+<p>为其他节点准备配置文件<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">cp config_s1r1.xml config_s2r1.xml</span><br><span class="line"></span><br><span class="line">cp config_s1r1.xml config_s3r1.xml</span><br><span class="line"></span><br><span class="line">cp config_s2r2.xml config_s3r2.xml</span><br><span class="line"></span><br><span class="line">cp config_s2r2.xml config_s1r2.xml</span><br></pre></td></tr></table></figure><br>修改 config_s2r1.xml</p>
+<p>将路径中的s1r1 全部替换成 s2r1</p>
+<p>宏定义部分<br><figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">macros</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">shard</span>&gt;</span>02<span class="tag">&lt;/<span class="name">shard</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">replica</span>&gt;</span>02-1<span class="tag">&lt;/<span class="name">replica</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">macros</span>&gt;</span></span><br></pre></td></tr></table></figure><br>修改 config_s3r1.xml</p>
+<p>将路径中的s1r1 全部替换成 s3r1</p>
+<p>宏定义部分<br><figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">macros</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">shard</span>&gt;</span>03<span class="tag">&lt;/<span class="name">shard</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">replica</span>&gt;</span>03-1<span class="tag">&lt;/<span class="name">replica</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">macros</span>&gt;</span></span><br></pre></td></tr></table></figure><br>修改 config_s3r2.xml</p>
+<p>将路径中的s2r2 全部替换成 s3r2</p>
+<p>宏定义部分<br><figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">macros</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">shard</span>&gt;</span>03<span class="tag">&lt;/<span class="name">shard</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">replica</span>&gt;</span>03-2<span class="tag">&lt;/<span class="name">replica</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">macros</span>&gt;</span></span><br></pre></td></tr></table></figure></p>
+<p>将路径中的s2r2 全部替换成 s1r2</p>
+<p>宏定义部分<br><figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">macros</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">shard</span>&gt;</span>01<span class="tag">&lt;/<span class="name">shard</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">replica</span>&gt;</span>01-2<span class="tag">&lt;/<span class="name">replica</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">macros</span>&gt;</span></span><br></pre></td></tr></table></figure></p>
+<p>将文件分发到各个节点上</p>
+<p>172.28.160.2 保留  config_s1r1.xml config_s2r2.xml 文件</p>
+<p>172.28.160.3 保留  config_s2r1.xml config_s3r2.xml 文件</p>
+<p>172.28.160.4 保留  config_s3r1.xml config_s1r2.xml 文件<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">scp  config_s2r1.xml config_s3r2.xml  172.28.160.3:/etc/clickhouse-server/</span><br><span class="line"></span><br><span class="line">scp  config_s3r1.xml config_s1r2.xml  172.28.160.4:/etc/clickhouse-server/</span><br></pre></td></tr></table></figure><br>在172.28.160.2 上删除多余的文件</p>
+<p>rm -f  config_s2r1.xml config_s3r2.xml  config_s3r1.xml config_s1r2.xml</p>
+<p>新增clickhouse-keeper 配置文件</p>
+<p>vi keeper.xml<br><figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">clickhouse</span>&gt;</span></span><br><span class="line">          <span class="tag">&lt;<span class="name">logger</span>&gt;</span></span><br><span class="line">                 <span class="comment">&lt;!-- Possible levels [1]:</span></span><br><span class="line"><span class="comment">                    - none (turns off logging)</span></span><br><span class="line"><span class="comment">                    - fatal</span></span><br><span class="line"><span class="comment">                    - critical</span></span><br><span class="line"><span class="comment">                    - error</span></span><br><span class="line"><span class="comment">                    - warning</span></span><br><span class="line"><span class="comment">                    - notice</span></span><br><span class="line"><span class="comment">                    - information</span></span><br><span class="line"><span class="comment">                    - debug</span></span><br><span class="line"><span class="comment">                    - trace</span></span><br><span class="line"><span class="comment">                       [1]: https://github.com/pocoproject/poco/blob/poco-1.9.4-release/Foundation/include/Poco/Logger.h#L105-L114</span></span><br><span class="line"><span class="comment">                    --&gt;</span></span><br><span class="line">                  <span class="tag">&lt;<span class="name">level</span>&gt;</span>warning<span class="tag">&lt;/<span class="name">level</span>&gt;</span></span><br><span class="line">                  <span class="tag">&lt;<span class="name">log</span>&gt;</span>/var/log/clickhouse-keeper/clickhouse-keeper.log<span class="tag">&lt;/<span class="name">log</span>&gt;</span></span><br><span class="line">                  <span class="tag">&lt;<span class="name">errorlog</span>&gt;</span>/var/log/clickhouse-keeper/clickhouse-keeper.err.log<span class="tag">&lt;/<span class="name">errorlog</span>&gt;</span></span><br><span class="line">                  <span class="comment">&lt;!-- Rotation policy</span></span><br><span class="line"><span class="comment">                         See https://github.com/pocoproject/poco/blob/poco-1.9.4-release/Foundation/include/Poco/FileChannel.h#L54-L85</span></span><br><span class="line"><span class="comment">                   --&gt;</span></span><br><span class="line">                  <span class="tag">&lt;<span class="name">size</span>&gt;</span>1000M<span class="tag">&lt;/<span class="name">size</span>&gt;</span></span><br><span class="line">                  <span class="tag">&lt;<span class="name">count</span>&gt;</span>10<span class="tag">&lt;/<span class="name">count</span>&gt;</span></span><br><span class="line">                  <span class="comment">&lt;!-- &lt;console&gt;1&lt;/console&gt; --&gt;</span> <span class="comment">&lt;!-- Default behavior is autodetection (log to console if not daemon mode and is tty) --&gt;</span></span><br><span class="line">         <span class="tag">&lt;/<span class="name">logger</span>&gt;</span></span><br><span class="line"></span><br><span class="line">         <span class="tag">&lt;<span class="name">max_connections</span>&gt;</span>4096<span class="tag">&lt;/<span class="name">max_connections</span>&gt;</span></span><br><span class="line"></span><br><span class="line">         <span class="tag">&lt;<span class="name">keeper_server</span>&gt;</span></span><br><span class="line">                   <span class="tag">&lt;<span class="name">tcp_port</span>&gt;</span>2181<span class="tag">&lt;/<span class="name">tcp_port</span>&gt;</span></span><br><span class="line"></span><br><span class="line">                   <span class="comment">&lt;!-- Must be unique among all keeper serves --&gt;</span></span><br><span class="line">                   <span class="tag">&lt;<span class="name">server_id</span>&gt;</span>1<span class="tag">&lt;/<span class="name">server_id</span>&gt;</span></span><br><span class="line"></span><br><span class="line">                   <span class="tag">&lt;<span class="name">log_storage_path</span>&gt;</span>/var/lib/clickhouse/keeper/coordination/logs<span class="tag">&lt;/<span class="name">log_storage_path</span>&gt;</span></span><br><span class="line">                   <span class="tag">&lt;<span class="name">snapshot_storage_path</span>&gt;</span>/var/lib/clickhouse/keeper/coordination/snapshots<span class="tag">&lt;/<span class="name">snapshot_storage_path</span>&gt;</span></span><br><span class="line"></span><br><span class="line">                   <span class="tag">&lt;<span class="name">coordination_settings</span>&gt;</span></span><br><span class="line">                             <span class="tag">&lt;<span class="name">operation_timeout_ms</span>&gt;</span>10000<span class="tag">&lt;/<span class="name">operation_timeout_ms</span>&gt;</span></span><br><span class="line">                             <span class="tag">&lt;<span class="name">min_session_timeout_ms</span>&gt;</span>30000<span class="tag">&lt;/<span class="name">min_session_timeout_ms</span>&gt;</span></span><br><span class="line">                             <span class="tag">&lt;<span class="name">session_timeout_ms</span>&gt;</span>30000<span class="tag">&lt;/<span class="name">session_timeout_ms</span>&gt;</span></span><br><span class="line">                             <span class="tag">&lt;<span class="name">raft_logs_level</span>&gt;</span>warning<span class="tag">&lt;/<span class="name">raft_logs_level</span>&gt;</span></span><br><span class="line">                             <span class="comment">&lt;!-- All settings listed in https://github.com/ClickHouse/ClickHouse/blob/master/src/Coordination/CoordinationSettings.h --&gt;</span></span><br><span class="line">                   <span class="tag">&lt;/<span class="name">coordination_settings</span>&gt;</span></span><br><span class="line"></span><br><span class="line">                  <span class="comment">&lt;!-- enable sanity hostname checks for cluster configuration (e.g. if localhost is used with remote endpoints) --&gt;</span></span><br><span class="line">                  <span class="tag">&lt;<span class="name">hostname_checks_enabled</span>&gt;</span>true<span class="tag">&lt;/<span class="name">hostname_checks_enabled</span>&gt;</span></span><br><span class="line">                  <span class="tag">&lt;<span class="name">raft_configuration</span>&gt;</span></span><br><span class="line">                           <span class="tag">&lt;<span class="name">server</span>&gt;</span></span><br><span class="line">                                    <span class="tag">&lt;<span class="name">id</span>&gt;</span>1<span class="tag">&lt;/<span class="name">id</span>&gt;</span></span><br><span class="line">                                    <span class="tag">&lt;<span class="name">hostname</span>&gt;</span>172.28.160.2<span class="tag">&lt;/<span class="name">hostname</span>&gt;</span></span><br><span class="line">                                    <span class="tag">&lt;<span class="name">port</span>&gt;</span>9444<span class="tag">&lt;/<span class="name">port</span>&gt;</span></span><br><span class="line">                          <span class="tag">&lt;/<span class="name">server</span>&gt;</span></span><br><span class="line">                          <span class="tag">&lt;<span class="name">server</span>&gt;</span></span><br><span class="line">                                    <span class="tag">&lt;<span class="name">id</span>&gt;</span>2<span class="tag">&lt;/<span class="name">id</span>&gt;</span></span><br><span class="line">                                    <span class="tag">&lt;<span class="name">hostname</span>&gt;</span>172.28.160.3<span class="tag">&lt;/<span class="name">hostname</span>&gt;</span></span><br><span class="line">                                    <span class="tag">&lt;<span class="name">port</span>&gt;</span>9444<span class="tag">&lt;/<span class="name">port</span>&gt;</span></span><br><span class="line">                          <span class="tag">&lt;/<span class="name">server</span>&gt;</span></span><br><span class="line">                          <span class="tag">&lt;<span class="name">server</span>&gt;</span></span><br><span class="line">                                   <span class="tag">&lt;<span class="name">id</span>&gt;</span>3<span class="tag">&lt;/<span class="name">id</span>&gt;</span></span><br><span class="line">                                   <span class="tag">&lt;<span class="name">hostname</span>&gt;</span>172.28.160.4<span class="tag">&lt;/<span class="name">hostname</span>&gt;</span></span><br><span class="line">                                   <span class="tag">&lt;<span class="name">port</span>&gt;</span>9444<span class="tag">&lt;/<span class="name">port</span>&gt;</span></span><br><span class="line">                         <span class="tag">&lt;/<span class="name">server</span>&gt;</span></span><br><span class="line"></span><br><span class="line">                         <span class="comment">&lt;!-- Add more servers here --&gt;</span></span><br><span class="line">                <span class="tag">&lt;/<span class="name">raft_configuration</span>&gt;</span></span><br><span class="line">       <span class="tag">&lt;/<span class="name">keeper_server</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;/<span class="name">clickhouse</span>&gt;</span></span><br></pre></td></tr></table></figure><br>将keeper.xml 拷贝到其他2个节点上<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">scp  keeper.xml  172.28.160.3:/etc/clickhouse-server/</span><br><span class="line">scp  keeper.xml  172.28.160.4:/etc/clickhouse-server/</span><br></pre></td></tr></table></figure><br>在172.28.160.3 修改 keeper.xml  替换server_id  为 <server_id>2</server_id></p>
+<p>在172.28.160.4 修改 keeper.xml  替换server_id  为 <server_id>3</server_id></p>
+<p>配置user.xml 文件,添加集群用户repl。3节点上都添加</p>
+<p>vi user.xml<br><figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">users</span>&gt;</span></span><br><span class="line">         <span class="comment">&lt;!-- replicat user --&gt;</span></span><br><span class="line">         <span class="tag">&lt;<span class="name">repl</span>&gt;</span></span><br><span class="line">                 <span class="tag">&lt;<span class="name">password_sha256_hex</span>&gt;</span>SHA256PASSWORD<span class="tag">&lt;/<span class="name">password_sha256_hex</span>&gt;</span></span><br><span class="line">                 <span class="tag">&lt;<span class="name">networks</span>&gt;</span></span><br><span class="line">                          <span class="tag">&lt;<span class="name">ip</span>&gt;</span>::/0<span class="tag">&lt;/<span class="name">ip</span>&gt;</span></span><br><span class="line">                 <span class="tag">&lt;/<span class="name">networks</span>&gt;</span></span><br><span class="line">                 <span class="tag">&lt;<span class="name">profile</span>&gt;</span>default<span class="tag">&lt;/<span class="name">profile</span>&gt;</span></span><br><span class="line">                 <span class="tag">&lt;<span class="name">quota</span>&gt;</span>default<span class="tag">&lt;/<span class="name">quota</span>&gt;</span></span><br><span class="line">         <span class="tag">&lt;/<span class="name">repl</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">users</span>&gt;</span></span><br></pre></td></tr></table></figure><br>重新全部授权 clickhouse </p>
+<p>chown -R clickhouse:clickhouse /etc/clickhouse-server</p>
+<h5 id="6-设置systemctl-启动脚本，并启动集群"><a href="#6-设置systemctl-启动脚本，并启动集群" class="headerlink" title="6. 设置systemctl 启动脚本，并启动集群"></a>6. 设置systemctl 启动脚本，并启动集群</h5><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">vi  clickhouse-keeper.service</span><br><span class="line"></span><br><span class="line">[Unit]</span><br><span class="line">Description=ClickHouse Keeper (analytic DBMS <span class="keyword">for</span> big data)</span><br><span class="line">Requires=network-online.target</span><br><span class="line"><span class="comment"># <span class="doctag">NOTE:</span> that After/Wants=time-sync.target is not enough, you need to ensure</span></span><br><span class="line"><span class="comment"># that the time was adjusted already, if you use systemd-timesyncd you are</span></span><br><span class="line"><span class="comment"># safe, but if you use ntp or some other daemon, you should configure it</span></span><br><span class="line"><span class="comment"># additionaly.</span></span><br><span class="line">After=time-sync.target network-online.target</span><br><span class="line">Wants=time-sync.target</span><br><span class="line"></span><br><span class="line">[Service]</span><br><span class="line">Type=simple</span><br><span class="line">User=clickhouse</span><br><span class="line">Group=clickhouse</span><br><span class="line">Restart=always</span><br><span class="line">RestartSec=30</span><br><span class="line">ExecStart=/usr/bin/clickhouse-keeper --config=/etc/clickhouse-server/keeper.xml --pid-file=/var/lib/clickhouse/keeper/clickhouse-keeper.pid</span><br><span class="line">LimitCORE=infinity</span><br><span class="line">LimitNOFILE=500000</span><br><span class="line">CapabilityBoundingSet=CAP_NET_ADMIN CAP_IPC_LOCK CAP_SYS_NICE CAP_NET_BIND_SERVICE</span><br><span class="line"></span><br><span class="line">[Install]</span><br><span class="line"><span class="comment"># ClickHouse should not start from the rescue shell (rescue.target).</span></span><br><span class="line">WantedBy=multi-user.target</span><br></pre></td></tr></table></figure>
+<p>将启动脚本拷贝到/lib/systemd/system/<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cp clickhouse-keeper.service /lib/systemd/system/clickhouse-keeper.service</span><br></pre></td></tr></table></figure><br>重载并启动<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">systemctl daemon-reload</span><br><span class="line">systemctl start clickhouse-keeper.service</span><br></pre></td></tr></table></figure><br>启动成功验证<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">systemctl status clickhouse-keeper.service</span><br></pre></td></tr></table></figure><br>将这个脚本拷贝到其他2个服务器上。执行同样的操作。</p>
+<p>这样keeper 集群就启动了，可以通过跟zookeeper 一样的四字母命令来查看zookeeper 的状态<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">[root@ct-bigdata-clickhouse-160-2 clickhouse-server]# echo mntr | nc localhost 2181</span><br><span class="line">zk_version v22.12.3.5-stable-893de538f0298310edb9ea1d7c83968cbbc5310f</span><br><span class="line">zk_avg_latency 0</span><br><span class="line">zk_max_latency 0</span><br><span class="line">zk_min_latency 0</span><br><span class="line">zk_packets_received 0</span><br><span class="line">zk_packets_sent 0</span><br><span class="line">zk_num_alive_connections 0</span><br><span class="line">zk_outstanding_requests 0</span><br><span class="line">zk_server_state leader</span><br><span class="line">zk_znode_count 3</span><br><span class="line">zk_watch_count 0</span><br><span class="line">zk_ephemerals_count 0</span><br><span class="line">zk_approximate_data_size 644</span><br><span class="line">zk_key_arena_size 4096</span><br><span class="line">zk_latest_snapshot_size 0</span><br><span class="line">zk_open_file_descriptor_count 41</span><br><span class="line">zk_max_file_descriptor_count 12640848</span><br><span class="line">zk_followers 2</span><br><span class="line">zk_synced_followers 2</span><br><span class="line"></span><br></pre></td></tr></table></figure></p>
+<p>接下来配置clickhouse-server 的启动脚本<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cp /lib/systemd/system/clickhouse-server.service   /lib/systemd/system/clickhouse-server_s1r1.service</span><br></pre></td></tr></table></figure><br>修改启动配置文件的路径以及pid 文件的存放路径<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line">vi /lib/systemd/system/clickhouse-server_s1r1.service  </span><br><span class="line"></span><br><span class="line">[Unit]</span><br><span class="line">Description=ClickHouse Server (analytic DBMS for big data)</span><br><span class="line">Requires=network-online.target</span><br><span class="line"># NOTE: that After/Wants=time-sync.target is not enough, you need to ensure</span><br><span class="line"># that the time was adjusted already, if you use systemd-timesyncd you are</span><br><span class="line"># safe, but if you use ntp or some other daemon, you should configure it</span><br><span class="line"># additionaly.</span><br><span class="line">After=time-sync.target network-online.target</span><br><span class="line">Wants=time-sync.target</span><br><span class="line"></span><br><span class="line">[Service]</span><br><span class="line">Type=notify</span><br><span class="line"></span><br><span class="line"># Switching off watchdog is very important for sd_notify to work correctly.</span><br><span class="line">Environment=CLICKHOUSE_WATCHDOG_ENABLE=0</span><br><span class="line">User=clickhouse</span><br><span class="line">Group=clickhouse</span><br><span class="line">Restart=always</span><br><span class="line">RestartSec=30</span><br><span class="line">RuntimeDirectory=clickhouse-server</span><br><span class="line">ExecStart=/usr/bin/clickhouse-server --config=/etc/clickhouse-server/config_s1r1.xml --pid-file=/var/lib/clickhouse/s1r1/clickhouse-server_s1r1.pid</span><br><span class="line"># Minus means that this file is optional.</span><br><span class="line">EnvironmentFile=-/etc/default/clickhouse</span><br><span class="line">LimitCORE=infinity</span><br><span class="line">LimitNOFILE=500000</span><br><span class="line">CapabilityBoundingSet=CAP_NET_ADMIN CAP_IPC_LOCK CAP_SYS_NICE CAP_NET_BIND_SERVICE</span><br><span class="line"></span><br><span class="line">[Install]</span><br><span class="line"># ClickHouse should not start from the rescue shell (rescue.target).</span><br><span class="line">WantedBy=multi-user.target</span><br></pre></td></tr></table></figure><br>对应的其他实例在ExecStart=的位置将配置文件指定到对应的配置文件以及路径上。</p>
+<p>在172.28.160.2 上</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">lickhouse-server_s1r1.service  ExecStart=/usr/bin/clickhouse-server --config=/etc/clickhouse-server/config_s1r1.xml --pid-file=/var/lib/clickhouse/s1r1/clickhouse-server_s1r1.pid</span><br><span class="line"></span><br><span class="line">clickhouse-server_s2r2.service  ExecStart=/usr/bin/clickhouse-server --config=/etc/clickhouse-server/config_s2r2.xml --pid-file=/var/lib/clickhouse/s1r1/clickhouse-server_s2r2.pid</span><br><span class="line"></span><br><span class="line">systemctl daemon-reload</span><br><span class="line"></span><br><span class="line">systemctl start clickhouse-server_s1r1.service</span><br><span class="line"></span><br><span class="line">systemctl start clickhouse-server_s2r2.service</span><br></pre></td></tr></table></figure>
+<p>在172.28.160.3 上<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">lickhouse-server_s2r1.service  ExecStart=/usr/bin/clickhouse-server --config=/etc/clickhouse-server/config_s2r1.xml --pid-file=/var/lib/clickhouse/s1r1/clickhouse-server_s2r1.pid</span><br><span class="line"></span><br><span class="line">clickhouse-server_s3r2.service  ExecStart=/usr/bin/clickhouse-server --config=/etc/clickhouse-server/config_s3r2.xml --pid-file=/var/lib/clickhouse/s1r1/clickhouse-server_s3r2.pid</span><br><span class="line"></span><br><span class="line">systemctl daemon-reload</span><br><span class="line"></span><br><span class="line">systemctl start clickhouse-server_s2r1.service</span><br><span class="line"></span><br><span class="line">systemctl start clickhouse-server_s3r2.service</span><br></pre></td></tr></table></figure><br>在172.28.160.4 上<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">lickhouse-server_s3r1.service  ExecStart=/usr/bin/clickhouse-server --config=/etc/clickhouse-server/config_s3r1.xml --pid-file=/var/lib/clickhouse/s1r1/clickhouse-server_s3r1.pid</span><br><span class="line"></span><br><span class="line">clickhouse-server_s1r2.service  ExecStart=/usr/bin/clickhouse-server --config=/etc/clickhouse-server/config_s1r2.xml --pid-file=/var/lib/clickhouse/s1r1/clickhouse-server_s1r2.pid</span><br><span class="line"></span><br><span class="line">systemctl daemon-reload</span><br><span class="line"></span><br><span class="line">systemctl start clickhouse-server_s3r1.service</span><br><span class="line"></span><br><span class="line">systemctl start clickhouse-server_s1r2.service</span><br></pre></td></tr></table></figure></p>
+<h5 id="7-集群验证"><a href="#7-集群验证" class="headerlink" title="7. 集群验证"></a>7. 集群验证</h5><p>节点启动成功后,可以登录本地节点查看<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">[root@ct-bigdata-clickhouse-160-2 ~]# clickhouse-client --user=default --password=123456</span><br><span class="line">ClickHouse client version 22.12.3.5 (official build).</span><br><span class="line">Connecting to localhost:9000 as user default.</span><br><span class="line">Connected to ClickHouse server version 22.12.3 revision 54461.</span><br><span class="line"></span><br><span class="line">ct-bigdata-clickhouse-160-2 :) </span><br><span class="line"></span><br><span class="line">ct-bigdata-clickhouse-160-2 :) select * from system.clusters;</span><br><span class="line"></span><br><span class="line">SELECT *</span><br><span class="line">FROM system.clusters</span><br><span class="line"></span><br><span class="line">Query id: 85ad631d-dacf-49d0-a410-3b3420d2e619</span><br><span class="line"></span><br><span class="line">┌─cluster─────────────────────┬─shard_num─┬─shard_weight─┬─replica_num─┬─host_name────┬─host_address─┬─port─┬─is_local─┬─user─┬─default_database─┬─errors_count─┬─slowdowns_count─┬─estimated_recovery_time─┐</span><br><span class="line">│ three_shards_tow_replicated │ 1 │ 1 │ 1 │ 172.28.160.2 │ 172.28.160.2 │ 9000 │ 1 │ repl │ │ 0 │ 0 │ 0 │</span><br><span class="line">│ three_shards_tow_replicated │ 1 │ 1 │ 2 │ 172.28.160.4 │ 172.28.160.4 │ 9001 │ 0 │ repl │ │ 0 │ 0 │ 0 │</span><br><span class="line">│ three_shards_tow_replicated │ 2 │ 1 │ 1 │ 172.28.160.3 │ 172.28.160.3 │ 9000 │ 0 │ repl │ │ 0 │ 0 │ 0 │</span><br><span class="line">│ three_shards_tow_replicated │ 2 │ 1 │ 2 │ 172.28.160.2 │ 172.28.160.2 │ 9001 │ 0 │ repl │ │ 0 │ 0 │ 0 │</span><br><span class="line">│ three_shards_tow_replicated │ 3 │ 1 │ 1 │ 172.28.160.4 │ 172.28.160.4 │ 9000 │ 0 │ repl │ │ 0 │ 0 │ 0 │</span><br><span class="line">│ three_shards_tow_replicated │ 3 │ 1 │ 2 │ 172.28.160.3 │ 172.28.160.3 │ 9001 │ 0 │ repl │ │ 0 │ 0 │ 0 │</span><br><span class="line">└─────────────────────────────┴───────────┴──────────────┴─────────────┴──────────────┴──────────────┴──────┴──────────┴──────┴──────────────────┴──────────────┴─────────────────┴─────────────────────────┘</span><br><span class="line"></span><br><span class="line">6 rows in set. Elapsed: 0.001 sec.</span><br></pre></td></tr></table></figure><br>通过查询clusters 系统表。可以看到集群信息</p>
+<p>建一个集群表验证一下<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">ct-bigdata-clickhouse-160-2 :) create table test_cluster_table on cluster three_shards_tow_replicated (id int,name String,price int ) ENGINE = ReplicatedMergeTree(&#x27;/clickhouse/tables/&#123;shard&#125;/default/test_cluster_table&#x27;,&#x27;&#123;replica&#125;&#x27;) ORDER BY id;</span><br><span class="line"></span><br><span class="line">CREATE TABLE test_cluster_table ON CLUSTER three_shards_tow_replicated</span><br><span class="line">(</span><br><span class="line">`id` int,</span><br><span class="line">`name` String,</span><br><span class="line">`price` int</span><br><span class="line">)</span><br><span class="line">ENGINE = ReplicatedMergeTree(&#x27;/clickhouse/tables/&#123;shard&#125;/default/test_cluster_table&#x27;, &#x27;&#123;replica&#125;&#x27;)</span><br><span class="line">ORDER BY id</span><br><span class="line"></span><br><span class="line">Query id: 0461fe5a-19f6-4017-9683-a596670b34e3</span><br><span class="line"></span><br><span class="line">┌─host─────────┬─port─┬─status─┬─error─┬─num_hosts_remaining─┬─num_hosts_active─┐</span><br><span class="line">│ 172.28.160.4 │ 9000 │ 0 │ │ 5 │ 0 │</span><br><span class="line">│ 172.28.160.4 │ 9001 │ 0 │ │ 4 │ 0 │</span><br><span class="line">│ 172.28.160.3 │ 9001 │ 0 │ │ 3 │ 0 │</span><br><span class="line">│ 172.28.160.2 │ 9000 │ 0 │ │ 2 │ 0 │</span><br><span class="line">│ 172.28.160.2 │ 9001 │ 0 │ │ 1 │ 0 │</span><br><span class="line">│ 172.28.160.3 │ 9000 │ 0 │ │ 0 │ 0 │</span><br><span class="line">└──────────────┴──────┴────────┴───────┴─────────────────────┴──────────────────┘</span><br><span class="line"></span><br><span class="line">6 rows in set. Elapsed: 0.310 sec.</span><br><span class="line"></span><br></pre></td></tr></table></figure></p>
+<p>可以看到各个节点上均已创建了表，集群功能正常</p>
+<p>验证插入数据<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line">ct-bigdata-clickhouse-160-2 :) insert into test_cluster_table values(1,&#x27;光猫200&#x27;,88)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">ct-bigdata-clickhouse-160-2 :) select * from test_cluster_table;</span><br><span class="line"></span><br><span class="line">SELECT *</span><br><span class="line">FROM test_cluster_table</span><br><span class="line"></span><br><span class="line">Query id: c29c5e62-8843-4456-98b5-2cdda06068fb</span><br><span class="line"></span><br><span class="line">┌─id─┬─name────┬─price─┐</span><br><span class="line">│ 1 │ 光猫200 │ 88 │</span><br><span class="line">└────┴─────────┴───────┘</span><br><span class="line"></span><br><span class="line">1 row in set. Elapsed: 0.001 sec.</span><br><span class="line"></span><br><span class="line">[root@ct-bigdata-clickhouse-160-4 ~]# clickhouse-client --user=default --password=123456 --port=9001</span><br><span class="line">ClickHouse client version 22.12.3.5 (official build).</span><br><span class="line">Connecting to localhost:9001 as user default.</span><br><span class="line">Connected to ClickHouse server version 22.12.3 revision 54461.</span><br><span class="line"></span><br><span class="line">ct-bigdata-clickhouse-160-4 :) select * from test_cluster_table;</span><br><span class="line"></span><br><span class="line">SELECT *</span><br><span class="line">FROM test_cluster_table</span><br><span class="line"></span><br><span class="line">Query id: 97c833d2-cd9a-4994-95c6-7919555b5e55</span><br><span class="line"></span><br><span class="line">┌─id─┬─name────┬─price─┐</span><br><span class="line">│ 1 │ 光猫200 │ 88 │</span><br><span class="line">└────┴─────────┴───────┘</span><br><span class="line"></span><br><span class="line">1 row in set. Elapsed: 0.001 sec.</span><br><span class="line"></span><br><span class="line"></span><br></pre></td></tr></table></figure><br>上面的结果可以看到 在s1r1 插入的数据。在 s1r2 实例上可以看到。replica 功能正常。</p>
+<p>以上为clickhouse 集群安装完整步骤。</p>
+<h5 id="8-将集群配置独立写到metrika-xml-的方法"><a href="#8-将集群配置独立写到metrika-xml-的方法" class="headerlink" title="8. 将集群配置独立写到metrika.xml 的方法"></a>8. 将集群配置独立写到metrika.xml 的方法</h5><p>上述安装过程是将集群配置 <remote_servers> 写在 config 配置文件中，这里提供另一种方案，将remote_servers 的配置写在额外的配置文件中。默认额外配置文件读取路径为 /etc/metrika.xml</p>
+<p>1) 在 172.28.160.2 节点上 /etc/config.d/ 目录中创建文件 metrika.xml </p>
+<p>vi metrika.xml<br><figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;?xml version=<span class="string">&quot;1.0&quot;</span>?&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">yandex</span>&gt;</span></span><br><span class="line">       <span class="tag">&lt;<span class="name">clickhouse_remote_servers</span>&gt;</span></span><br><span class="line">              <span class="tag">&lt;<span class="name">three_shards_tow_replicated</span>&gt;</span></span><br><span class="line">                      <span class="tag">&lt;<span class="name">shard</span>&gt;</span></span><br><span class="line">                             <span class="tag">&lt;<span class="name">internal_replication</span>&gt;</span>true<span class="tag">&lt;/<span class="name">internal_replication</span>&gt;</span></span><br><span class="line">                             <span class="tag">&lt;<span class="name">replica</span>&gt;</span></span><br><span class="line">                                    <span class="tag">&lt;<span class="name">host</span>&gt;</span>172.28.160.2<span class="tag">&lt;/<span class="name">host</span>&gt;</span></span><br><span class="line">                                    <span class="tag">&lt;<span class="name">port</span>&gt;</span>9000<span class="tag">&lt;/<span class="name">port</span>&gt;</span></span><br><span class="line">                                    <span class="tag">&lt;<span class="name">user</span>&gt;</span>repl<span class="tag">&lt;/<span class="name">user</span>&gt;</span></span><br><span class="line">                                    <span class="tag">&lt;<span class="name">password</span>&gt;</span>PLAINPASSWORD<span class="tag">&lt;/<span class="name">password</span>&gt;</span></span><br><span class="line">                             <span class="tag">&lt;/<span class="name">replica</span>&gt;</span></span><br><span class="line">                             <span class="tag">&lt;<span class="name">replica</span>&gt;</span></span><br><span class="line">                                   <span class="tag">&lt;<span class="name">host</span>&gt;</span>172.28.160.4<span class="tag">&lt;/<span class="name">host</span>&gt;</span></span><br><span class="line">                                   <span class="tag">&lt;<span class="name">port</span>&gt;</span>9001<span class="tag">&lt;/<span class="name">port</span>&gt;</span></span><br><span class="line">                                   <span class="tag">&lt;<span class="name">user</span>&gt;</span>repl<span class="tag">&lt;/<span class="name">user</span>&gt;</span></span><br><span class="line">                                   <span class="tag">&lt;<span class="name">password</span>&gt;</span>PLAINPASSWORD<span class="tag">&lt;/<span class="name">password</span>&gt;</span></span><br><span class="line">                             <span class="tag">&lt;/<span class="name">replica</span>&gt;</span></span><br><span class="line">                      <span class="tag">&lt;/<span class="name">shard</span>&gt;</span></span><br><span class="line">                      <span class="tag">&lt;<span class="name">shard</span>&gt;</span></span><br><span class="line">                             <span class="tag">&lt;<span class="name">internal_replication</span>&gt;</span>true<span class="tag">&lt;/<span class="name">internal_replication</span>&gt;</span></span><br><span class="line">                             <span class="tag">&lt;<span class="name">replica</span>&gt;</span></span><br><span class="line">                                     <span class="tag">&lt;<span class="name">host</span>&gt;</span>172.28.160.3<span class="tag">&lt;/<span class="name">host</span>&gt;</span></span><br><span class="line">                                     <span class="tag">&lt;<span class="name">port</span>&gt;</span>9000<span class="tag">&lt;/<span class="name">port</span>&gt;</span></span><br><span class="line">                                     <span class="tag">&lt;<span class="name">user</span>&gt;</span>repl<span class="tag">&lt;/<span class="name">user</span>&gt;</span></span><br><span class="line">                                     <span class="tag">&lt;<span class="name">password</span>&gt;</span>PLAINPASSWORD<span class="tag">&lt;/<span class="name">password</span>&gt;</span></span><br><span class="line">                            <span class="tag">&lt;/<span class="name">replica</span>&gt;</span></span><br><span class="line">                            <span class="tag">&lt;<span class="name">replica</span>&gt;</span></span><br><span class="line">                                    <span class="tag">&lt;<span class="name">host</span>&gt;</span>172.28.160.2<span class="tag">&lt;/<span class="name">host</span>&gt;</span></span><br><span class="line">                                    <span class="tag">&lt;<span class="name">port</span>&gt;</span>9001<span class="tag">&lt;/<span class="name">port</span>&gt;</span></span><br><span class="line">                                    <span class="tag">&lt;<span class="name">user</span>&gt;</span>repl<span class="tag">&lt;/<span class="name">user</span>&gt;</span></span><br><span class="line">                                    <span class="tag">&lt;<span class="name">password</span>&gt;</span>PLAINPASSWORD<span class="tag">&lt;/<span class="name">password</span>&gt;</span></span><br><span class="line">                            <span class="tag">&lt;/<span class="name">replica</span>&gt;</span></span><br><span class="line">                     <span class="tag">&lt;/<span class="name">shard</span>&gt;</span></span><br><span class="line">                     <span class="tag">&lt;<span class="name">shard</span>&gt;</span></span><br><span class="line">                            <span class="tag">&lt;<span class="name">internal_replication</span>&gt;</span>true<span class="tag">&lt;/<span class="name">internal_replication</span>&gt;</span></span><br><span class="line">                            <span class="tag">&lt;<span class="name">replica</span>&gt;</span></span><br><span class="line">                                   <span class="tag">&lt;<span class="name">host</span>&gt;</span>172.28.160.4<span class="tag">&lt;/<span class="name">host</span>&gt;</span></span><br><span class="line">                                   <span class="tag">&lt;<span class="name">port</span>&gt;</span>9000<span class="tag">&lt;/<span class="name">port</span>&gt;</span></span><br><span class="line">                                   <span class="tag">&lt;<span class="name">user</span>&gt;</span>repl<span class="tag">&lt;/<span class="name">user</span>&gt;</span></span><br><span class="line">                                   <span class="tag">&lt;<span class="name">password</span>&gt;</span>PLAINPASSWORD<span class="tag">&lt;/<span class="name">password</span>&gt;</span></span><br><span class="line">                            <span class="tag">&lt;/<span class="name">replica</span>&gt;</span></span><br><span class="line">                            <span class="tag">&lt;<span class="name">replica</span>&gt;</span></span><br><span class="line">                                   <span class="tag">&lt;<span class="name">host</span>&gt;</span>172.28.160.3<span class="tag">&lt;/<span class="name">host</span>&gt;</span></span><br><span class="line">                                   <span class="tag">&lt;<span class="name">port</span>&gt;</span>9001<span class="tag">&lt;/<span class="name">port</span>&gt;</span></span><br><span class="line">                                   <span class="tag">&lt;<span class="name">user</span>&gt;</span>repl<span class="tag">&lt;/<span class="name">user</span>&gt;</span></span><br><span class="line">                                   <span class="tag">&lt;<span class="name">password</span>&gt;</span>PLAINPASSWORD<span class="tag">&lt;/<span class="name">password</span>&gt;</span></span><br><span class="line">                           <span class="tag">&lt;/<span class="name">replica</span>&gt;</span></span><br><span class="line">                     <span class="tag">&lt;/<span class="name">shard</span>&gt;</span></span><br><span class="line">             <span class="tag">&lt;/<span class="name">three_shards_tow_replicated</span>&gt;</span></span><br><span class="line">       <span class="tag">&lt;/<span class="name">clickhouse_remote_servers</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">yandex</span>&gt;</span></span><br></pre></td></tr></table></figure><br>将该文件发送到其他节点上上<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">scp metrika.xml 172.28.160.3:/etc/clickhouse-server/config.d/</span><br><span class="line"></span><br><span class="line">scp metrika.xml 172.28.160.4:/etc/clickhouse-server/config.d/</span><br></pre></td></tr></table></figure><br>三个节点上对该文件修改所有者为 clickhouse</p>
+<p>2) 修改config 文件，所有实例的config 文件都要修改</p>
+<p>将原先<code>&lt;remote_servers&gt;。。。&lt;/remote_servers&gt;</code> 的配置屏蔽或者删除</p>
+<p>添加<br>表示将引用子文件 clickhouse_remote_servers 属性下的配置,incl对应metrika 里面的标签名。<br><figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">remote_servers</span> <span class="attr">incl</span>=<span class="string">&quot;clickhouse_remote_servers&quot;</span> /&gt;</span></span><br></pre></td></tr></table></figure><br>修改读取 metrika.xml 的路径。<br><figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">include_from</span>&gt;</span>/etc/clickhouse-server/config.d/metrika.xml<span class="tag">&lt;/<span class="name">include_from</span>&gt;</span></span><br></pre></td></tr></table></figure><br>3) 重启实例，并检查集群是否正常</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/cluster/" rel="tag"># cluster</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/01/13/MergeTree/" rel="prev" title="clickhouse 的 MergeTree 引擎">
+      <i class="fa fa-chevron-left"></i> clickhouse 的 MergeTree 引擎
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/02/28/hadoop3EC/" rel="next" title="hadoop3.x 纠删码策略">
+      hadoop3.x 纠删码策略 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%80-%E8%A7%84%E5%88%92%EF%BC%9A"><span class="nav-number">1.</span> <span class="nav-text">一 规划：</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%BA%8C-%E5%AE%89%E8%A3%85"><span class="nav-number">2.</span> <span class="nav-text">二 安装</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#1-%E4%B8%8B%E8%BD%BD-clickhouse-%E7%A8%B3%E5%AE%9A%E7%89%88%E6%9C%AC%E5%9C%B0%E5%9D%80-%EF%BC%9Ahttps-packages-clickhouse-com-rpm-stable"><span class="nav-number">2.1.</span> <span class="nav-text">1. 下载 clickhouse 稳定版本地址 ：https:&#x2F;&#x2F;packages.clickhouse.com&#x2F;rpm&#x2F;stable&#x2F;</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#2-%E5%AE%89%E8%A3%85%E5%89%8D%E6%A3%80%E6%B5%8B%E4%BB%A5%E5%8F%8A%E4%BC%98%E5%8C%96%E7%B3%BB%E7%BB%9F%E9%A1%B9%E9%85%8D%E7%BD%AE"><span class="nav-number">2.2.</span> <span class="nav-text">2. 安装前检测以及优化系统项配置</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#3-%E6%8C%89%E9%A1%BA%E5%BA%8F%E5%AE%89%E8%A3%85RPM-%E5%8C%85"><span class="nav-number">2.3.</span> <span class="nav-text">3. 按顺序安装RPM 包</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#4-%E8%AE%BE%E7%BD%AE%E7%9B%AE%E5%BD%95"><span class="nav-number">2.4.</span> <span class="nav-text">4. 设置目录</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#5-%E8%AE%BE%E7%BD%AE%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6"><span class="nav-number">2.5.</span> <span class="nav-text">5. 设置配置文件</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#6-%E8%AE%BE%E7%BD%AEsystemctl-%E5%90%AF%E5%8A%A8%E8%84%9A%E6%9C%AC%EF%BC%8C%E5%B9%B6%E5%90%AF%E5%8A%A8%E9%9B%86%E7%BE%A4"><span class="nav-number">2.6.</span> <span class="nav-text">6. 设置systemctl 启动脚本，并启动集群</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#7-%E9%9B%86%E7%BE%A4%E9%AA%8C%E8%AF%81"><span class="nav-number">2.7.</span> <span class="nav-text">7. 集群验证</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#8-%E5%B0%86%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AE%E7%8B%AC%E7%AB%8B%E5%86%99%E5%88%B0metrika-xml-%E7%9A%84%E6%96%B9%E6%B3%95"><span class="nav-number">2.8.</span> <span class="nav-text">8. 将集群配置独立写到metrika.xml 的方法</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Sheen</p>
+  <div class="site-description" itemprop="description">数据库相关技术研究,自动化运维</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">29</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">39</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Sheen</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/pjax/pjax.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[data-pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.dataset.pjax !== undefined) {
+      script.dataset.pjax = '';
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '78f8e6427a00d33b1454',
+      clientSecret: 'df55248398c379200efd40824ecae2d9fd208e20',
+      repo        : 'sheenzxx.github.io',
+      owner       : 'sheenzxx',
+      admin       : ['sheenzxx'],
+      id          : 'ffbff9ee79caa1b8e221d77f6129109c',
+        language: 'zh-CN',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+    </div>
+</body>
+</html>

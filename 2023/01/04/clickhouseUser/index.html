@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"sheenzxx.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"gitalk","storage":true,"lazyload":false,"nav":null,"activeClass":"gitalk"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="clickhouse 在旧版本创建用户以及密码需要通过修改users.xml 配置文件，笔记麻烦。在20.5 开始支持SQL话的用户配置首先修改配置 &#x2F;etc&#x2F;clickhouse-server&#x2F;users.xml，打开 SQL USER mode123456789&lt;users&gt;    &lt;default&gt;        ....        &lt;!-- User ca">
+<meta property="og:type" content="article">
+<meta property="og:title" content="基于SQL user mode 的用户创建">
+<meta property="og:url" content="https://sheenzxx.github.io/2023/01/04/clickhouseUser/index.html">
+<meta property="og:site_name" content="sheen&#39;s Blog">
+<meta property="og:description" content="clickhouse 在旧版本创建用户以及密码需要通过修改users.xml 配置文件，笔记麻烦。在20.5 开始支持SQL话的用户配置首先修改配置 &#x2F;etc&#x2F;clickhouse-server&#x2F;users.xml，打开 SQL USER mode123456789&lt;users&gt;    &lt;default&gt;        ....        &lt;!-- User ca">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2023-01-04T04:08:09.000Z">
+<meta property="article:modified_time" content="2023-01-11T02:46:17.181Z">
+<meta property="article:author" content="Sheen">
+<meta property="article:tag" content="database">
+<meta property="article:tag" content="create user">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://sheenzxx.github.io/2023/01/04/clickhouseUser/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>基于SQL user mode 的用户创建 | sheen's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="sheen's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">sheen's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">随笔，技术笔记</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/home/" rel="section"><i class="home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://sheenzxx.github.io/2023/01/04/clickhouseUser/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Sheen">
+      <meta itemprop="description" content="数据库相关技术研究,自动化运维">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="sheen's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          基于SQL user mode 的用户创建
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2023-01-04 12:08:09" itemprop="dateCreated datePublished" datetime="2023-01-04T12:08:09+08:00">2023-01-04</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2023-01-11 10:46:17" itemprop="dateModified" datetime="2023-01-11T10:46:17+08:00">2023-01-11</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/clickhouse/" itemprop="url" rel="index"><span itemprop="name">clickhouse</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>clickhouse 在旧版本创建用户以及密码需要通过修改users.xml 配置文件，笔记麻烦。在20.5 开始支持SQL话的用户配置<br>首先修改配置 /etc/clickhouse-server/users.xml，打开 SQL USER mode<br><figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">users</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">default</span>&gt;</span></span><br><span class="line">        ....</span><br><span class="line">        <span class="comment">&lt;!-- User can create other users and grant rights to them. --&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">access_management</span>&gt;</span>1<span class="tag">&lt;/<span class="name">access_management</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">default</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">users</span>&gt;</span></span><br><span class="line"></span><br><span class="line"></span><br></pre></td></tr></table></figure><br>重启服务</p>
+<p>定义一个用户<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line">clickhouse<span class="operator">-</span>client <span class="comment">--user default --password &lt;password&gt;</span></span><br><span class="line"><span class="comment">-- 创建一个管理员用户</span></span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">USER</span> clickhouse_admin IDENTIFIED <span class="keyword">BY</span> <span class="string">&#x27;password&#x27;</span>;</span><br><span class="line"><span class="keyword">GRANT</span> <span class="keyword">ALL</span> <span class="keyword">ON</span> <span class="operator">*</span>.<span class="operator">*</span> <span class="keyword">TO</span> clickhouse_admin <span class="keyword">WITH</span> <span class="keyword">GRANT</span> OPTION;</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 展示权限</span></span><br><span class="line"><span class="keyword">SHOW</span> GRANTS <span class="keyword">FOR</span> clickhouse_admin;</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 创建普通用户</span></span><br><span class="line"><span class="comment">-- 创建一个列读取用户</span></span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">USER</span> column_user IDENTIFIED <span class="keyword">BY</span> <span class="string">&#x27;password&#x27;</span>;</span><br><span class="line"><span class="comment">-- 创建一个行读取用户</span></span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">USER</span> row_user IDENTIFIED <span class="keyword">BY</span> <span class="string">&#x27;password&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 创建一个 列查询角色，并授权表上的列读取权限</span></span><br><span class="line"><span class="keyword">CREATE</span> ROLE column1_users;</span><br><span class="line"><span class="keyword">GRANT</span> <span class="keyword">SELECT</span>(id, column1) <span class="keyword">ON</span> db1.table1 <span class="keyword">TO</span> column1_users;</span><br><span class="line"><span class="comment">-- 将角色授权给列用户</span></span><br><span class="line"><span class="keyword">GRANT</span> column1_users <span class="keyword">TO</span> column_user;</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 创建一个 行策略查询角色</span></span><br><span class="line"><span class="keyword">CREATE</span> ROLE A_rows_users;</span><br><span class="line"><span class="comment">-- 将行策略角色授权给行查询用户</span></span><br><span class="line"><span class="keyword">GRANT</span> A_rows_users <span class="keyword">TO</span> row_user;</span><br><span class="line"><span class="comment">-- 创建行查询策略给角色 A_rows_users</span></span><br><span class="line"><span class="keyword">CREATE</span> <span class="type">ROW</span> POLICY A_row_filter <span class="keyword">ON</span> db1.table1 <span class="keyword">FOR</span> <span class="keyword">SELECT</span> <span class="keyword">USING</span> column1 <span class="operator">=</span> <span class="string">&#x27;A&#x27;</span> <span class="keyword">TO</span> A_rows_users;</span><br><span class="line"><span class="comment">-- 授权查询db1.table1 上的列查询权限给角色 A_rows_users</span></span><br><span class="line"><span class="keyword">GRANT</span> <span class="keyword">SELECT</span>(id, column1, column2) <span class="keyword">ON</span> db1.table1 <span class="keyword">TO</span> A_rows_users;</span><br><span class="line"><span class="comment">-- 创建一个其他可访问该表整表的角色给其他用户</span></span><br><span class="line"><span class="keyword">CREATE</span> <span class="type">ROW</span> POLICY allow_other_users_filter <span class="keyword">ON</span> db1.table1 <span class="keyword">FOR</span> <span class="keyword">SELECT</span> <span class="keyword">USING</span> <span class="number">1</span> <span class="keyword">TO</span> clickhouse_admin, column1_users;</span><br><span class="line">将策略附加到表时，系统将应用该策略，并且只有那些定义的用户和角色才能对表进行操作，其他所有用户和角色都将被拒绝任何操作。 为了不将限制性行策略应用于其他用户，必须定义另一个策略以允许其他用户和角色具有常规或其他类型的访问权限。</span><br></pre></td></tr></table></figure></p>
+<p>修改用户和角色<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 创建一个具有默认角色的用户</span></span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">USER</span> row_and_column_user IDENTIFIED <span class="keyword">BY</span> <span class="string">&#x27;password&#x27;</span> <span class="keyword">DEFAULT</span> ROLE A_rows_users;</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 回收角色A_rows_users的部分权限</span></span><br><span class="line"><span class="keyword">REVOKE</span> <span class="keyword">SELECT</span>(id, column1, column2) <span class="keyword">ON</span> db1.table1 <span class="keyword">FROM</span> A_rows_users;</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 允许角色A_rows_users 只能查询 column1 列</span></span><br><span class="line"><span class="keyword">GRANT</span> <span class="keyword">SELECT</span>(id, column1) <span class="keyword">ON</span> db1.table1 <span class="keyword">TO</span> A_rows_users;</span><br><span class="line"></span><br></pre></td></tr></table></figure></p>
+<p>查看权限<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 查看角色 row_and_column_user 具有什么权限</span></span><br><span class="line"><span class="keyword">SHOW</span> GRANTS <span class="keyword">FOR</span> row_and_column_user</span><br><span class="line"><span class="comment">-- 查看clickhouse 建有的角色</span></span><br><span class="line"><span class="keyword">SHOW</span> ROLES</span><br><span class="line"></span><br><span class="line"><span class="comment">--查看所有行策略</span></span><br><span class="line"><span class="keyword">SHOW</span> <span class="type">ROW</span> POLICIES</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 查看策略 A_row_filter 定义</span></span><br><span class="line"><span class="keyword">SHOW</span> <span class="keyword">CREATE</span> <span class="type">ROW</span> POLICY A_row_filter <span class="keyword">ON</span> db1.table1</span><br><span class="line"></span><br></pre></td></tr></table></figure></p>
+<p>管理角色，策略，用户<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 回收角色A_rows_users 在table1 表上查询colunm1 的权限</span></span><br><span class="line"><span class="keyword">REVOKE</span> <span class="keyword">SELECT</span>(column1, id) <span class="keyword">ON</span> db1.table1 <span class="keyword">FROM</span> A_rows_users;</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 删除策略A_row_filter</span></span><br><span class="line"><span class="keyword">DROP</span> <span class="type">ROW</span> POLICY A_row_filter <span class="keyword">ON</span> db1.table1;</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 回收row_user 的角色 A_rows_users</span></span><br><span class="line"><span class="keyword">REVOKE</span> A_rows_users <span class="keyword">FROM</span> row_user;</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 删除角色</span></span><br><span class="line"><span class="keyword">DROP</span> ROLE A_rows_users;</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 删除用户</span></span><br><span class="line"><span class="keyword">DROP</span> <span class="keyword">USER</span> row_user;</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 修改用户密码</span></span><br><span class="line"><span class="keyword">ALTER</span> <span class="keyword">USER</span> row_user@<span class="string">&#x27;192.168.%.%&#x27;</span> IDENTIFIED <span class="keyword">WITH</span> sha256_password <span class="keyword">BY</span> <span class="string">&#x27;passwd2&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 创建profile</span></span><br><span class="line"><span class="keyword">CREATE</span> SETTINGS PROFILE low_mem_readonly SETTINGS max_threads <span class="operator">=</span> <span class="number">4</span>, max_memory_usage <span class="operator">=</span> <span class="number">4000000000</span> READONLY;</span><br><span class="line"><span class="keyword">CREATE</span> ROLE role_low_mem SETTINGS PROFILE <span class="string">&#x27;low_mem_readonly&#x27;</span>;</span><br><span class="line"><span class="keyword">GRANT</span> <span class="keyword">SELECT</span> <span class="keyword">ON</span> db1.<span class="operator">*</span> <span class="keyword">TO</span> role_low_mem;</span><br></pre></td></tr></table></figure></p>
+<p>通过命令创建的用户权限可以在access 目录里面查看到<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="built_in">cd</span> /data1/clickhouse/access</span><br><span class="line">[root@bigdata access]<span class="comment"># ll</span></span><br><span class="line">总用量 32</span><br><span class="line">-rw-r-----. 1 clickhouse clickhouse  263 Dec 28 10:52 344a88a5-c2bc-a961-252d.sql</span><br><span class="line">-rw-r-----. 1 clickhouse clickhouse 2365 Jan  4 10:53 b406882-c6bd-65dd-413e-721a4b75afaf.sql</span><br><span class="line">-rw-r-----. 1 clickhouse clickhouse    1 Dec 21 17:36 quotas.list</span><br><span class="line">-rw-r-----. 1 clickhouse clickhouse    1 Dec 21 17:36 roles.list</span><br><span class="line">-rw-r-----. 1 clickhouse clickhouse    1 Dec 21 17:36 row_policies.list</span><br><span class="line">-rw-r-----. 1 clickhouse clickhouse    1 Dec 21 17:36 settings_profiles.list</span><br><span class="line">-rw-r-----. 1 clickhouse clickhouse  143 Jan  4 10:51 users.list</span><br><span class="line"></span><br><span class="line"><span class="built_in">cat</span> users.list</span><br><span class="line">testeb406882-c6bd-65dd-413e-721a4b75afaf clickhouse_admin344a88a5-c2bc-a961-252d</span><br><span class="line"></span><br><span class="line">相关用户的权限语句可以在对应的 xxx.sql 查看</span><br><span class="line">比如 clickhouse_admin 对应上面的 344a88a5-c2bc-a961-252d.sql</span><br><span class="line"></span><br></pre></td></tr></table></figure></p>
+<p>以上操作都是在单点中执行。也仅在单点中生效<br><em>如果是部署的集群。需要在集群中生效。则需要加上 ON CLUSTER 子句</em><br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> IF <span class="keyword">NOT</span> <span class="keyword">EXISTS</span> all_hits <span class="keyword">ON</span> CLUSTER cluster (p <span class="type">Date</span>, i Int32) ENGINE <span class="operator">=</span> Distributed(cluster, <span class="keyword">default</span>, hits)</span><br></pre></td></tr></table></figure></p>
+<p>看回完整的USER 语法<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">USER</span> [IF <span class="keyword">NOT</span> <span class="keyword">EXISTS</span> <span class="operator">|</span> <span class="keyword">OR</span> REPLACE] name1 [<span class="keyword">ON</span> CLUSTER cluster_name1]</span><br><span class="line">        [, name2 [<span class="keyword">ON</span> CLUSTER cluster_name2] ...]</span><br><span class="line">    [<span class="keyword">NOT</span> IDENTIFIED <span class="operator">|</span> IDENTIFIED &#123;[<span class="keyword">WITH</span> &#123;no_password <span class="operator">|</span> plaintext_password <span class="operator">|</span> sha256_password <span class="operator">|</span> sha256_hash <span class="operator">|</span> double_sha1_password <span class="operator">|</span> double_sha1_hash&#125;] <span class="keyword">BY</span> &#123;<span class="string">&#x27;password&#x27;</span> <span class="operator">|</span> <span class="string">&#x27;hash&#x27;</span>&#125;&#125; <span class="operator">|</span> &#123;<span class="keyword">WITH</span> ldap SERVER <span class="string">&#x27;server_name&#x27;</span>&#125; <span class="operator">|</span> &#123;<span class="keyword">WITH</span> kerberos [REALM <span class="string">&#x27;realm&#x27;</span>]&#125; <span class="operator">|</span> &#123;<span class="keyword">WITH</span> ssl_certificate CN <span class="string">&#x27;common_name&#x27;</span>&#125;]</span><br><span class="line">    [HOST &#123;<span class="keyword">LOCAL</span> <span class="operator">|</span> NAME <span class="string">&#x27;name&#x27;</span> <span class="operator">|</span> REGEXP <span class="string">&#x27;name_regexp&#x27;</span> <span class="operator">|</span> IP <span class="string">&#x27;address&#x27;</span> <span class="operator">|</span> <span class="keyword">LIKE</span> <span class="string">&#x27;pattern&#x27;</span>&#125; [,...] <span class="operator">|</span> <span class="keyword">ANY</span> <span class="operator">|</span> <span class="keyword">NONE</span>]</span><br><span class="line">    [<span class="keyword">DEFAULT</span> ROLE role [,...]]</span><br><span class="line">    [<span class="keyword">DEFAULT</span> DATABASE database <span class="operator">|</span> <span class="keyword">NONE</span>]</span><br><span class="line">    [GRANTEES &#123;<span class="keyword">user</span> <span class="operator">|</span> role <span class="operator">|</span> <span class="keyword">ANY</span> <span class="operator">|</span> <span class="keyword">NONE</span>&#125; [,...] [<span class="keyword">EXCEPT</span> &#123;<span class="keyword">user</span> <span class="operator">|</span> role&#125; [,...]]]</span><br><span class="line">    [SETTINGS variable [<span class="operator">=</span> <span class="keyword">value</span>] [MIN [<span class="operator">=</span>] min_value] [MAX [<span class="operator">=</span>] max_value] [READONLY <span class="operator">|</span> WRITABLE] <span class="operator">|</span> PROFILE <span class="string">&#x27;profile_name&#x27;</span>] [,...]</span><br></pre></td></tr></table></figure></p>
+<p>ALTER 权限树<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line">.</span><br><span class="line">├── ALTER (only <span class="keyword">for</span> table and view)/</span><br><span class="line">│   ├── ALTER TABLE/</span><br><span class="line">│   │   ├── ALTER UPDATE</span><br><span class="line">│   │   ├── ALTER DELETE</span><br><span class="line">│   │   ├── ALTER COLUMN/</span><br><span class="line">│   │   │   ├── ALTER ADD COLUMN</span><br><span class="line">│   │   │   ├── ALTER DROP COLUMN</span><br><span class="line">│   │   │   ├── ALTER MODIFY COLUMN</span><br><span class="line">│   │   │   ├── ALTER COMMENT COLUMN</span><br><span class="line">│   │   │   ├── ALTER CLEAR COLUMN</span><br><span class="line">│   │   │   └── ALTER RENAME COLUMN</span><br><span class="line">│   │   ├── ALTER INDEX/</span><br><span class="line">│   │   │   ├── ALTER ORDER BY</span><br><span class="line">│   │   │   ├── ALTER SAMPLE BY</span><br><span class="line">│   │   │   ├── ALTER ADD INDEX</span><br><span class="line">│   │   │   ├── ALTER DROP INDEX</span><br><span class="line">│   │   │   ├── ALTER MATERIALIZE INDEX</span><br><span class="line">│   │   │   └── ALTER CLEAR INDEX</span><br><span class="line">│   │   ├── ALTER CONSTRAINT/</span><br><span class="line">│   │   │   ├── ALTER ADD CONSTRAINT</span><br><span class="line">│   │   │   └── ALTER DROP CONSTRAINT</span><br><span class="line">│   │   ├── ALTER TTL/</span><br><span class="line">│   │   │   └── ALTER MATERIALIZE TTL</span><br><span class="line">│   │   ├── ALTER SETTINGS</span><br><span class="line">│   │   ├── ALTER MOVE PARTITION</span><br><span class="line">│   │   ├── ALTER FETCH PARTITION</span><br><span class="line">│   │   └── ALTER FREEZE PARTITION</span><br><span class="line">│   └── ALTER LIVE VIEW/</span><br><span class="line">│       ├── ALTER LIVE VIEW REFRESH</span><br><span class="line">│       └── ALTER LIVE VIEW MODIFY QUERY</span><br><span class="line">├── ALTER DATABASE</span><br><span class="line">├── ALTER USER</span><br><span class="line">├── ALTER ROLE</span><br><span class="line">├── ALTER QUOTA</span><br><span class="line">├── ALTER [ROW] POLICY</span><br><span class="line">└── ALTER [SETTINGS] PROFILE</span><br></pre></td></tr></table></figure><br>示例<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">grant</span> <span class="keyword">alter</span> <span class="keyword">on</span> my_db.my_table <span class="keyword">TO</span> my_user;</span><br><span class="line"><span class="keyword">SHOW</span> GRANTS <span class="keyword">FOR</span>  my_user;</span><br><span class="line">┌─GRANTS <span class="keyword">FOR</span> my_user───────────────────────────────────────────┐</span><br><span class="line">│ <span class="keyword">GRANT</span> <span class="keyword">ALTER</span> <span class="keyword">TABLE</span>, <span class="keyword">ALTER</span> <span class="keyword">VIEW</span> <span class="keyword">ON</span> my_db.my_table <span class="keyword">TO</span> my_user   │</span><br><span class="line">└──────────────────────────────────────────────────────────────┘</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 这里我们可以看到 alter 作用于 表上 包含了 alter table , alter view 2个主权限，其下还包含各种详细的权限。由上面的ALTER 权限树可以看出。</span></span><br><span class="line"></span><br><span class="line"><span class="comment">-- 单独授权添加列的权限</span></span><br><span class="line"><span class="keyword">GRANT</span> <span class="keyword">ALTER</span> <span class="keyword">ADD</span> <span class="keyword">COLUMN</span> <span class="keyword">ON</span> my_db.my_table <span class="keyword">TO</span> my_user;</span><br><span class="line"><span class="keyword">SHOW</span> GRANTS <span class="keyword">FOR</span> my_user;</span><br><span class="line">┌─GRANTS <span class="keyword">FOR</span> my_user──────────────────────────────────┐</span><br><span class="line">│ <span class="keyword">GRANT</span> <span class="keyword">ALTER</span> <span class="keyword">ADD</span> <span class="keyword">COLUMN</span> <span class="keyword">ON</span> my_db.my_table <span class="keyword">TO</span> my_user │</span><br><span class="line">└─────────────────────────────────────────────────────┘</span><br><span class="line"></span><br><span class="line"><span class="comment">--回收添加表列的权限，</span></span><br><span class="line"><span class="keyword">REVOKE</span> <span class="keyword">ALTER</span> <span class="keyword">ADD</span> <span class="keyword">COLUMN</span> <span class="keyword">ON</span> my_db.my_table <span class="keyword">FROM</span> my_user;</span><br><span class="line">(</span><br><span class="line">回收任何上级权限，都会回收当前子集权限，<span class="keyword">REVOKE</span> <span class="keyword">ALTER</span> CLOUMN 也将会回收 <span class="keyword">ALTER</span> <span class="keyword">ADD</span> <span class="keyword">COLUMN</span> 的权限，在上面只授权一个子权限的情况下，</span><br><span class="line"><span class="keyword">REVOKE</span> <span class="keyword">ALTER</span> <span class="keyword">COLUMN</span> <span class="keyword">ON</span> my_db.my_table <span class="keyword">FROM</span> my_user;</span><br><span class="line">与直接回收子权限的语句等同。</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="keyword">SHOW</span> GRANTS <span class="keyword">FOR</span> my_user;</span><br><span class="line">Ok.</span><br><span class="line"></span><br><span class="line"><span class="number">0</span> <span class="keyword">rows</span> <span class="keyword">in</span> set. Elapsed: <span class="number">0.003</span> sec.</span><br></pre></td></tr></table></figure></p>
+<p>修改用户设置的4种方式</p>
+<ul>
+<li>1 通过配置 users.xml 配置文件。在 <code>&lt;profiles&gt;</code> 标签下面设置</li>
+<li>2 如果是会话级别参数 可以通过 <code>set setting=value</code> 的方式设置</li>
+<li>3 在查询期间设置<ul>
+<li>1) 在启动clickhouse-client 时加参数 <code>--setting=value</code></li>
+<li>2) 使用http API ,通过CGI 参数（<code>URL?setting_1=value&amp;setting_2=value...</code>）</li>
+<li>3) 在查询语句中指定settings ，<code>insert xxx values() settings setting1=value,setting2=value...</code></li>
+</ul>
+</li>
+<li>4 通过ALTER USER username settings 的方式 <figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">alter</span> <span class="keyword">user</span> bireport settings async_insert<span class="operator">=</span><span class="number">1</span>,wait_for_async_insert<span class="operator">=</span><span class="number">0</span>,async_insert_max_data_size<span class="operator">=</span><span class="number">500000</span>,async_insert_busy_timeout_ms<span class="operator">=</span><span class="number">5000</span></span><br></pre></td></tr></table></figure></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/database/" rel="tag"># database</a>
+              <a href="/tags/create-user/" rel="tag"># create user</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/12/16/mongoreplica/" rel="prev" title="mangodb 集群复制">
+      <i class="fa fa-chevron-left"></i> mangodb 集群复制
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/01/11/ckOptimize/" rel="next" title="ckOptimize">
+      ckOptimize <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Sheen</p>
+  <div class="site-description" itemprop="description">数据库相关技术研究,自动化运维</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">29</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">39</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Sheen</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/pjax/pjax.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[data-pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.dataset.pjax !== undefined) {
+      script.dataset.pjax = '';
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '78f8e6427a00d33b1454',
+      clientSecret: 'df55248398c379200efd40824ecae2d9fd208e20',
+      repo        : 'sheenzxx.github.io',
+      owner       : 'sheenzxx',
+      admin       : ['sheenzxx'],
+      id          : '0600c8a2a2d9d43d1652a5481a03afe2',
+        language: 'zh-CN',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+    </div>
+</body>
+</html>

@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"sheenzxx.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"gitalk","storage":true,"lazyload":false,"nav":null,"activeClass":"gitalk"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="MergeTree 的主要特性  存储按主键排序的数据 支持分区表 支持数据复制 支持数据采样  注意的是 Merge 引擎并不是 *MergeTree 引擎的家族成员 建一个 MergeTree 表1234567891011121314151617181920212223242526272829303132333435363738394041424344454647484950515253545">
+<meta property="og:type" content="article">
+<meta property="og:title" content="clickhouse 的 MergeTree 引擎">
+<meta property="og:url" content="https://sheenzxx.github.io/2023/01/13/MergeTree/index.html">
+<meta property="og:site_name" content="sheen&#39;s Blog">
+<meta property="og:description" content="MergeTree 的主要特性  存储按主键排序的数据 支持分区表 支持数据复制 支持数据采样  注意的是 Merge 引擎并不是 *MergeTree 引擎的家族成员 建一个 MergeTree 表1234567891011121314151617181920212223242526272829303132333435363738394041424344454647484950515253545">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2023-01-13T01:49:07.000Z">
+<meta property="article:modified_time" content="2023-01-31T02:08:14.155Z">
+<meta property="article:author" content="Sheen">
+<meta property="article:tag" content="engine">
+<meta property="article:tag" content="index">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://sheenzxx.github.io/2023/01/13/MergeTree/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>clickhouse 的 MergeTree 引擎 | sheen's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="sheen's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">sheen's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">随笔，技术笔记</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/home/" rel="section"><i class="home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://sheenzxx.github.io/2023/01/13/MergeTree/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Sheen">
+      <meta itemprop="description" content="数据库相关技术研究,自动化运维">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="sheen's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          clickhouse 的 MergeTree 引擎
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2023-01-13 09:49:07" itemprop="dateCreated datePublished" datetime="2023-01-13T09:49:07+08:00">2023-01-13</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2023-01-31 10:08:14" itemprop="dateModified" datetime="2023-01-31T10:08:14+08:00">2023-01-31</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/clickhouse/" itemprop="url" rel="index"><span itemprop="name">clickhouse</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>MergeTree 的主要特性</p>
+<ul>
+<li>存储按主键排序的数据</li>
+<li>支持分区表</li>
+<li>支持数据复制</li>
+<li>支持数据采样</li>
+</ul>
+<p><code>注意的是 Merge 引擎并不是 *MergeTree 引擎的家族成员</code></p>
+<h4 id="建一个-MergeTree-表"><a href="#建一个-MergeTree-表" class="headerlink" title="建一个 MergeTree 表"></a>建一个 MergeTree 表</h4><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> [IF <span class="keyword">NOT</span> <span class="keyword">EXISTS</span>] [db.]table_name [<span class="keyword">ON</span> CLUSTER cluster]</span><br><span class="line">(</span><br><span class="line">    name1 [type1] [<span class="keyword">DEFAULT</span><span class="operator">|</span>MATERIALIZED<span class="operator">|</span>ALIAS expr1] [TTL expr1],</span><br><span class="line">    name2 [type2] [<span class="keyword">DEFAULT</span><span class="operator">|</span>MATERIALIZED<span class="operator">|</span>ALIAS expr2] [TTL expr2],</span><br><span class="line">    ...</span><br><span class="line">    INDEX index_name1 expr1 TYPE type1(...) GRANULARITY value1,</span><br><span class="line">    INDEX index_name2 expr2 TYPE type2(...) GRANULARITY value2,</span><br><span class="line">    ...</span><br><span class="line">    PROJECTION projection_name_1 (<span class="keyword">SELECT</span> <span class="operator">&lt;</span><span class="keyword">COLUMN</span> LIST EXPR<span class="operator">&gt;</span> [<span class="keyword">GROUP</span> <span class="keyword">BY</span>] [<span class="keyword">ORDER</span> <span class="keyword">BY</span>]),</span><br><span class="line">    PROJECTION projection_name_2 (<span class="keyword">SELECT</span> <span class="operator">&lt;</span><span class="keyword">COLUMN</span> LIST EXPR<span class="operator">&gt;</span> [<span class="keyword">GROUP</span> <span class="keyword">BY</span>] [<span class="keyword">ORDER</span> <span class="keyword">BY</span>])</span><br><span class="line">) ENGINE <span class="operator">=</span> MergeTree()</span><br><span class="line"><span class="keyword">ORDER</span> <span class="keyword">BY</span> expr</span><br><span class="line">[<span class="keyword">PARTITION</span> <span class="keyword">BY</span> expr]</span><br><span class="line">[<span class="keyword">PRIMARY</span> KEY expr]</span><br><span class="line">[SAMPLE <span class="keyword">BY</span> expr]</span><br><span class="line">[TTL expr</span><br><span class="line">    [<span class="keyword">DELETE</span><span class="operator">|</span><span class="keyword">TO</span> DISK <span class="string">&#x27;xxx&#x27;</span><span class="operator">|</span><span class="keyword">TO</span> VOLUME <span class="string">&#x27;xxx&#x27;</span> [, ...] ]</span><br><span class="line">    [<span class="keyword">WHERE</span> conditions]</span><br><span class="line">    [<span class="keyword">GROUP</span> <span class="keyword">BY</span> key_expr [<span class="keyword">SET</span> v1 <span class="operator">=</span> aggr_func(v1) [, v2 <span class="operator">=</span> aggr_func(v2) ...]] ] ]</span><br><span class="line">[SETTINGS name<span class="operator">=</span><span class="keyword">value</span>, ...]</span><br><span class="line"></span><br><span class="line">ENGINE： 指定 MergeTree() ,MergeTree 引擎没有参数</span><br><span class="line"><span class="keyword">ORDER</span> <span class="keyword">BY</span>： 指定一组排序键, 例如 <span class="keyword">ORDER</span> <span class="keyword">BY</span> (event_date,counter_id)不需要排序时指定 tuple()如果没有指定 <span class="keyword">PRIMARY</span> KEY 则clickhouse 会按<span class="keyword">ORDER</span> <span class="keyword">BY</span> 的排序字段建一个主键</span><br><span class="line"><span class="keyword">PARTITION</span> <span class="keyword">BY</span>：指定分区键，分区并不会加速查询，不要使用细粒度的键作为分区键。按月分区可使用 toYYYYMM(date_column) 表达式</span><br><span class="line"><span class="keyword">PRIMARY</span> KEY：主键，当主键顺序与 <span class="keyword">ORDER</span> <span class="keyword">BY</span> 排序键不一致时指定</span><br><span class="line">SAMPLE <span class="keyword">BY</span>：采样表达式。采样列必须包含在主键里面。例如:SAMPLE <span class="keyword">BY</span> intHash32(UserID) <span class="keyword">ORDER</span> <span class="keyword">BY</span> (CounterID, EventDate, intHash32(UserID))</span><br><span class="line">TTL：指定一系列规则，规定行的持续存储时长，并定义数据在磁盘与卷之间自动转移的逻辑。比如定时将部分数据转化为冷数据,存储到普通磁盘中。表达式必须包含日期或者时间的字段。</span><br><span class="line">示例:</span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> example_table</span><br><span class="line">(</span><br><span class="line">    d DateTime,</span><br><span class="line">    a <span class="type">Int</span></span><br><span class="line">)</span><br><span class="line">ENGINE <span class="operator">=</span> MergeTree</span><br><span class="line"><span class="keyword">PARTITION</span> <span class="keyword">BY</span> toYYYYMM(d)</span><br><span class="line"><span class="keyword">ORDER</span> <span class="keyword">BY</span> d</span><br><span class="line">TTL d <span class="operator">+</span> <span class="type">INTERVAL</span> <span class="number">1</span> <span class="keyword">MONTH</span> <span class="keyword">DELETE</span>,   <span class="comment">-- 删除超过一个月的行</span></span><br><span class="line">    d <span class="operator">+</span> <span class="type">INTERVAL</span> <span class="number">1</span> WEEK <span class="keyword">TO</span> VOLUME <span class="string">&#x27;aaa&#x27;</span>, <span class="comment">-- 超过1周的行转移到名为aaa 的卷</span></span><br><span class="line">    d <span class="operator">+</span> <span class="type">INTERVAL</span> <span class="number">2</span> WEEK <span class="keyword">TO</span> DISK <span class="string">&#x27;bbb&#x27;</span>; <span class="comment">-- 超过2周的行转移到名为 bbb 的磁盘</span></span><br><span class="line"></span><br><span class="line">SETTINGS：设置控制MergeTree 行为的参数</span><br><span class="line">   index_granularity：索引粒度，定义一个索引标记存储的最大行数。默认值 <span class="number">8192</span>行</span><br><span class="line">   index_granularity_bytes：数据粒度的最大大小。默认值 <span class="number">10</span>Mb ,如果只按行数限制，则需要将其值设置为<span class="number">0</span> (不推荐)</span><br><span class="line">   min_index_granularity_bytes：数据粒度最小大小。默认<span class="number">1024</span>b,防止意外创建具有非常低粒度的表</span><br><span class="line">   enable_mixed_granularity_parts：是否启动 index_granularity_bytes 的开关。启动数据粒度大小限制有利于提高大行表的查询</span><br><span class="line">   use_minimalistic_part_header_in_zookeeper：设置在zookeeper中存储数据部分头部信息的方法。设置为<span class="number">1</span> 将存储更少的信息</span><br><span class="line">   min_merge_bytes_to_use_direct_io：设置在合并操作时直接使用DIRECT_IO 的最小数据量，默认<span class="number">10</span>MB，设置<span class="number">1</span> 开启， <span class="number">0</span> 关闭</span><br><span class="line">   merge_with_ttl_timeout：在重复合并数据执行 ttl <span class="keyword">delete</span> 操作时的最小间隔时间 。默认<span class="number">4</span>小时</span><br><span class="line">   merge_with_recompression_ttl_timeout：在重复合并数据执行 ttl 压缩 操作时的最小间隔时间。默认<span class="number">4</span>小时</span><br><span class="line">   try_fetch_recompressed_part_timeout：clickhouse 在启动合并压缩数据前，尝试从副本里获取此次标志合并压缩的已压缩数据的超时时间。 默认<span class="number">2</span>小时</span><br><span class="line">   write_final_mark：是否在数据部分末尾写上最终索引标记(在最后一个字节之后)。默认 <span class="number">1</span> 开启， 请不要关掉它</span><br><span class="line">   merge_max_block_size：合并时块的最大行数，默认 <span class="number">8192</span></span><br><span class="line">   storage_policy：存储策略</span><br><span class="line">   min_bytes_for_wide_part,min_rows_for_wide_part：设置可以存储为wide 格式的最小的数据大小<span class="operator">/</span>最小的行数</span><br><span class="line">   max_parts_in_total：最大的分区数</span><br><span class="line">   max_compress_block_size：数据压缩前数据块的最大尺寸。</span><br><span class="line">   min_compress_block_size：数据压缩前数据块的最小尺寸。</span><br><span class="line">   max_partitions_to_read：查询时可以查的最大分区数</span><br></pre></td></tr></table></figure>
+<h4 id="数据存储"><a href="#数据存储" class="headerlink" title="数据存储"></a>数据存储</h4><p>一张表由按主键排序的数据部分组成<br>主键没有唯一性约束，允许插入多条相同主键的数据</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/engine/" rel="tag"># engine</a>
+              <a href="/tags/index/" rel="tag"># index</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/01/11/ckOptimize/" rel="prev" title="ckOptimize">
+      <i class="fa fa-chevron-left"></i> ckOptimize
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/01/29/buildClickHouseCluster/" rel="next" title="搭建clichouse 集群">
+      搭建clichouse 集群 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%BB%BA%E4%B8%80%E4%B8%AA-MergeTree-%E8%A1%A8"><span class="nav-number">1.</span> <span class="nav-text">建一个 MergeTree 表</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%AD%98%E5%82%A8"><span class="nav-number">2.</span> <span class="nav-text">数据存储</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Sheen</p>
+  <div class="site-description" itemprop="description">数据库相关技术研究,自动化运维</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">29</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">39</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Sheen</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/pjax/pjax.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[data-pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.dataset.pjax !== undefined) {
+      script.dataset.pjax = '';
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '78f8e6427a00d33b1454',
+      clientSecret: 'df55248398c379200efd40824ecae2d9fd208e20',
+      repo        : 'sheenzxx.github.io',
+      owner       : 'sheenzxx',
+      admin       : ['sheenzxx'],
+      id          : '2caeff360124e630f9e132bbf211c82b',
+        language: 'zh-CN',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+    </div>
+</body>
+</html>
