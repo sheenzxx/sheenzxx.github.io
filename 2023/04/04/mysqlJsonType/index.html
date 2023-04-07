@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"sheenzxx.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"gitalk","storage":true,"lazyload":false,"nav":null,"activeClass":"gitalk"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="JSON 类型的存储跟LONGBLOB, LONGTEXT 一样 存储长度:L + 4 bytes, where L &lt; 2 的32次方JSON 的传输限制于 max_allowed_package 的大小，可以通过 JSON_STORAGE_SIZE()  函数来确定json 文档的大小JSON 类型并不能直接创建索引，而是由计算列支持123456789101112131415161718">
+<meta property="og:type" content="article">
+<meta property="og:title" content="mysql json 类型">
+<meta property="og:url" content="https://sheenzxx.github.io/2023/04/04/mysqlJsonType/index.html">
+<meta property="og:site_name" content="sheen&#39;s Blog">
+<meta property="og:description" content="JSON 类型的存储跟LONGBLOB, LONGTEXT 一样 存储长度:L + 4 bytes, where L &lt; 2 的32次方JSON 的传输限制于 max_allowed_package 的大小，可以通过 JSON_STORAGE_SIZE()  函数来确定json 文档的大小JSON 类型并不能直接创建索引，而是由计算列支持123456789101112131415161718">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2023-04-04T02:10:29.000Z">
+<meta property="article:modified_time" content="2023-04-06T08:48:14.918Z">
+<meta property="article:author" content="Sheen">
+<meta property="article:tag" content="json">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://sheenzxx.github.io/2023/04/04/mysqlJsonType/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>mysql json 类型 | sheen's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="sheen's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">sheen's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">随笔，技术笔记</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/home/" rel="section"><i class="home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://sheenzxx.github.io/2023/04/04/mysqlJsonType/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Sheen">
+      <meta itemprop="description" content="数据库相关技术研究,自动化运维">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="sheen's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          mysql json 类型
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2023-04-04 10:10:29" itemprop="dateCreated datePublished" datetime="2023-04-04T10:10:29+08:00">2023-04-04</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2023-04-06 16:48:14" itemprop="dateModified" datetime="2023-04-06T16:48:14+08:00">2023-04-06</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/mysql/" itemprop="url" rel="index"><span itemprop="name">mysql</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>JSON 类型的存储跟LONGBLOB, LONGTEXT 一样 存储长度:L + 4 bytes, where L &lt; 2 的32次方<br>JSON 的传输限制于 max_allowed_package 的大小，可以通过 JSON_STORAGE_SIZE()  函数来确定json 文档的大小<br>JSON 类型并不能直接创建索引，而是由计算列支持<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">create</span> <span class="keyword">table</span> test_json(</span><br><span class="line">     c json,</span><br><span class="line">     g <span class="type">int</span> generated always <span class="keyword">as</span> (c<span class="operator">-</span><span class="operator">&gt;</span>&quot;$.id&quot;),</span><br><span class="line">     key idx_g (g)</span><br><span class="line">);</span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> test_json (c) <span class="keyword">VALUES</span></span><br><span class="line">      (<span class="string">&#x27;&#123;&quot;id&quot;: &quot;1&quot;, &quot;name&quot;: &quot;Fred&quot;&#125;&#x27;</span>), (<span class="string">&#x27;&#123;&quot;id&quot;: &quot;2&quot;, &quot;name&quot;: &quot;Wilma&quot;&#125;&#x27;</span>),</span><br><span class="line">   (<span class="string">&#x27;&#123;&quot;id&quot;: &quot;3&quot;, &quot;name&quot;: &quot;Barney&quot;&#125;&#x27;</span>), (<span class="string">&#x27;&#123;&quot;id&quot;: &quot;4&quot;, &quot;name&quot;: &quot;Betty&quot;&#125;&#x27;</span>);</span><br><span class="line"><span class="keyword">select</span> <span class="operator">*</span> <span class="keyword">from</span> test_json;</span><br><span class="line">c                            <span class="operator">|</span>g<span class="operator">|</span></span><br><span class="line"><span class="comment">-----------------------------+-+</span></span><br><span class="line">&#123;&quot;id&quot;: &quot;1&quot;, &quot;name&quot;: &quot;Fred&quot;&#125;  <span class="operator">|</span><span class="number">1</span><span class="operator">|</span></span><br><span class="line">&#123;&quot;id&quot;: &quot;2&quot;, &quot;name&quot;: &quot;Wilma&quot;&#125; <span class="operator">|</span><span class="number">2</span><span class="operator">|</span></span><br><span class="line">&#123;&quot;id&quot;: &quot;3&quot;, &quot;name&quot;: &quot;Barney&quot;&#125;<span class="operator">|</span><span class="number">3</span><span class="operator">|</span></span><br><span class="line">&#123;&quot;id&quot;: &quot;4&quot;, &quot;name&quot;: &quot;Betty&quot;&#125; <span class="operator">|</span><span class="number">4</span><span class="operator">|</span></span><br><span class="line">explain <span class="keyword">select</span> <span class="operator">*</span> <span class="keyword">from</span> test_json <span class="keyword">where</span> c<span class="operator">-</span><span class="operator">&gt;</span>&quot;$.id&quot; <span class="operator">=</span><span class="number">1</span>;</span><br><span class="line">id<span class="operator">|</span>select_type<span class="operator">|</span><span class="keyword">table</span>    <span class="operator">|</span>partitions<span class="operator">|</span>type<span class="operator">|</span>possible_keys<span class="operator">|</span>key  <span class="operator">|</span>key_len<span class="operator">|</span><span class="keyword">ref</span>  <span class="operator">|</span><span class="keyword">rows</span><span class="operator">|</span>filtered<span class="operator">|</span>Extra<span class="operator">|</span></span><br><span class="line"><span class="comment">--+-----------+---------+----------+----+-------------+-----+-------+-----+----+--------+-----+</span></span><br><span class="line"> <span class="number">1</span><span class="operator">|</span>SIMPLE     <span class="operator">|</span>test_json<span class="operator">|</span>          <span class="operator">|</span><span class="keyword">ref</span> <span class="operator">|</span>idx_g        <span class="operator">|</span>idx_g<span class="operator">|</span><span class="number">5</span>      <span class="operator">|</span>const<span class="operator">|</span>   <span class="number">1</span><span class="operator">|</span>   <span class="number">100.0</span><span class="operator">|</span>     <span class="operator">|</span></span><br><span class="line"></span><br><span class="line"> <span class="operator">-</span><span class="operator">&gt;</span> 操作符相当于 json_extract() 函数</span><br><span class="line"> <span class="operator">-</span><span class="operator">&gt;&gt;</span> 操作符相当于 json_unquote() 函数 <span class="comment">--不带双引号</span></span><br><span class="line"> <span class="keyword">SELECT</span> c<span class="operator">-</span><span class="operator">&gt;</span>&quot;$.name&quot;,c<span class="operator">-</span><span class="operator">&gt;&gt;</span>&quot;$.name&quot; <span class="keyword">FROM</span> test_json</span><br><span class="line"> c<span class="operator">-</span><span class="operator">&gt;</span>&quot;$.name&quot;<span class="operator">|</span>c<span class="operator">-</span><span class="operator">&gt;&gt;</span>&quot;$.name&quot;<span class="operator">|</span></span><br><span class="line"><span class="comment">-----------+------------+</span></span><br><span class="line">&quot;Fred&quot;     <span class="operator">|</span>Fred        <span class="operator">|</span></span><br><span class="line">&quot;Wilma&quot;    <span class="operator">|</span>Wilma       <span class="operator">|</span></span><br><span class="line">&quot;Barney&quot;   <span class="operator">|</span>Barney      <span class="operator">|</span></span><br><span class="line">&quot;Betty&quot;    <span class="operator">|</span>Betty       <span class="operator">|</span></span><br><span class="line">&quot;Fred&quot;     <span class="operator">|</span>Fred        <span class="operator">|</span></span><br><span class="line">&quot;Wilma&quot;    <span class="operator">|</span>Wilma       <span class="operator">|</span></span><br></pre></td></tr></table></figure></p>
+<p>更新JSON 列的值<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">全字段更新</span><br><span class="line"><span class="keyword">update</span> test_json <span class="keyword">set</span> c<span class="operator">=</span><span class="string">&#x27;&#123;&quot;id&quot;: &quot;5&quot;, &quot;name&quot;: &quot;Sheen&quot;&#125;&#x27;</span> <span class="keyword">where</span> c<span class="operator">-</span><span class="operator">&gt;</span><span class="string">&#x27;$.id&#x27;</span> <span class="operator">=</span> <span class="number">5</span>;</span><br><span class="line">部分更新(<span class="number">8.0</span><span class="operator">+</span>)</span><br><span class="line">在<span class="keyword">update</span> 语句中通过 json_set(),json_replace(),json_remove() 这三个函数，对json 列进行部分更新操作</span><br><span class="line"># 输入列与被更新列必须是同一列</span><br><span class="line"><span class="keyword">UPDATE</span> mytable <span class="keyword">SET</span> jcol1 <span class="operator">=</span> JSON_SET(jcol1, <span class="string">&#x27;$.a&#x27;</span>, <span class="number">100</span>); </span><br><span class="line"># 这个操作在部分更新操作是不允许的。输入列与被更新列不一致</span><br><span class="line"><span class="keyword">UPDATE</span> mytable <span class="keyword">SET</span> jcol1 <span class="operator">=</span> JSON_SET(jcol2, <span class="string">&#x27;$.a&#x27;</span>, <span class="number">100</span>); </span><br><span class="line"># 被替换的值的存储空间必须至少和新值一样大。换句话说，新值不能大于旧值</span><br><span class="line">可以通过 JSON_STORAGE_FREE() 函数查看部分更新json 列释放的空间大小。</span><br><span class="line">通过设置 binlog_row_value_options <span class="operator">=</span> PARTIAL_JSON.可以使部分更新操作写入binlog时采用压缩格式。节省空间</span><br></pre></td></tr></table></figure></p>
+<p>创建 JSON 值<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">以中括号引起的json数组</span><br><span class="line">[&quot;abc&quot;, <span class="number">10</span>, <span class="keyword">null</span>, <span class="literal">true</span>, <span class="literal">false</span>]</span><br><span class="line"></span><br><span class="line">以花括号引起的key:<span class="keyword">value</span>的json对象</span><br><span class="line">&#123;&quot;k1&quot;: &quot;value&quot;, &quot;k2&quot;: <span class="number">10</span>&#125;</span><br><span class="line"></span><br><span class="line">都可以成为JSON类型的值，JSON 标量值可以包含各种数据类型。但是 key<span class="operator">-</span><span class="keyword">value</span> 对象中 key 必须是字符串，JSON对象允许循环嵌套json数组或对象</span><br><span class="line">[<span class="number">99</span>, &#123;&quot;id&quot;: &quot;HK500&quot;, &quot;cost&quot;: <span class="number">75.99</span>&#125;, [&quot;hot&quot;, &quot;cold&quot;]]</span><br><span class="line">&#123;&quot;k1&quot;: &quot;value&quot;, &quot;k2&quot;: [<span class="number">10</span>, <span class="number">20</span>]&#125;</span><br><span class="line">可以通过 <span class="built_in">CAST</span>(<span class="keyword">value</span> <span class="keyword">as</span> JSON) 将其他类型转化为JSON 类型</span><br></pre></td></tr></table></figure></p>
+<p>JSON_TYPE() 函数尝试解析一个JSON对象的类型。如果json对象有效则返回对应的类型。否则返回错误<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> json_type(<span class="string">&#x27;&#123;&quot;id&quot;: &quot;5&quot;, &quot;name&quot;: &quot;Fred&quot;&#125;&#x27;</span>)</span><br><span class="line">json_type(<span class="string">&#x27;&#123;&quot;id&quot;: &quot;5&quot;, &quot;name&quot;: &quot;Fred&quot;&#125;&#x27;</span>)<span class="operator">|</span></span><br><span class="line"><span class="comment">----------------------------------------+</span></span><br><span class="line">OBJECT                                  <span class="operator">|</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">select</span> json_type(<span class="string">&#x27;[1,2,3,4]&#x27;</span>) </span><br><span class="line">json_type(<span class="string">&#x27;[1,2,3,4]&#x27;</span>)<span class="operator">|</span></span><br><span class="line"><span class="comment">----------------------+</span></span><br><span class="line"><span class="keyword">ARRAY</span>                 <span class="operator">|</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">select</span> json_type(<span class="string">&#x27;1&#x27;</span>)</span><br><span class="line">json_type(<span class="string">&#x27;1&#x27;</span>)<span class="operator">|</span></span><br><span class="line"><span class="comment">--------------+</span></span><br><span class="line"><span class="type">INTEGER</span>       <span class="operator">|</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">select</span> json_type(<span class="string">&#x27;&quot;var&quot;&#x27;</span>) </span><br><span class="line">json_type(<span class="string">&#x27;&quot;var&quot;&#x27;</span>)<span class="operator">|</span></span><br><span class="line"><span class="comment">------------------+</span></span><br><span class="line">STRING            <span class="operator">|</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">select</span> json_type(<span class="string">&#x27;var&#x27;</span>) </span><br><span class="line"><span class="keyword">SQL</span> 错误 [<span class="number">3141</span>] [<span class="number">22001</span>]: Data truncation: Invalid JSON text <span class="keyword">in</span> argument <span class="number">1</span> <span class="keyword">to</span> <span class="keyword">function</span> json_type: &quot;Invalid value.&quot; <span class="keyword">at</span> position <span class="number">0.</span></span><br></pre></td></tr></table></figure></p>
+<p>JSON_ARRAY() 将给定的值列表组成一个json数组<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> <span class="built_in">json_array</span>(<span class="string">&#x27;var&#x27;</span>,<span class="number">1</span>,now())</span><br><span class="line"><span class="built_in">json_array</span>(<span class="string">&#x27;var&#x27;</span>,<span class="number">1</span>,now())               <span class="operator">|</span></span><br><span class="line"><span class="comment">----------------------------------------+</span></span><br><span class="line">[&quot;var&quot;, <span class="number">1</span>, &quot;2023-04-04 15:23:00.000000&quot;]<span class="operator">|</span></span><br></pre></td></tr></table></figure></p>
+<p>JSON_OBJECT() 将给定的key value 组成一个 json 对象<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> <span class="built_in">json_object</span>(<span class="string">&#x27;id&#x27;</span>,<span class="number">1</span>,<span class="string">&#x27;name&#x27;</span>,<span class="string">&#x27;Sheen&#x27;</span>)</span><br><span class="line"><span class="built_in">json_object</span>(<span class="string">&#x27;id&#x27;</span>,<span class="number">1</span>,<span class="string">&#x27;name&#x27;</span>,<span class="string">&#x27;Sheen&#x27;</span>)<span class="operator">|</span></span><br><span class="line"><span class="comment">----------------------------------+</span></span><br><span class="line">&#123;&quot;id&quot;: <span class="number">1</span>, &quot;name&quot;: &quot;Sheen&quot;&#125;        <span class="operator">|</span></span><br></pre></td></tr></table></figure></p>
+<p>JSON_MERGE_PRESERVE() 将多个json 文档合并成一个<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> JSON_MERGE_PRESERVE(<span class="string">&#x27;[&quot;a&quot;, 1]&#x27;</span>, <span class="string">&#x27;&#123;&quot;key&quot;: &quot;value&quot;&#125;&#x27;</span>);</span><br><span class="line">JSON_MERGE_PRESERVE(<span class="string">&#x27;[&quot;a&quot;, 1]&#x27;</span>, <span class="string">&#x27;&#123;&quot;key&quot;: &quot;value&quot;&#125;&#x27;</span>)<span class="operator">|</span></span><br><span class="line"><span class="comment">---------------------------------------------------+</span></span><br><span class="line">[&quot;a&quot;, <span class="number">1</span>, &#123;&quot;key&quot;: &quot;value&quot;&#125;]                         <span class="operator">|</span></span><br></pre></td></tr></table></figure></p>
+<p>JSON值的规范化<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="built_in">JSON_OBJECT</span>(<span class="string">&#x27;key1&#x27;</span>, <span class="number">1</span>, <span class="string">&#x27;key2&#x27;</span>, <span class="string">&#x27;abc&#x27;</span>, <span class="string">&#x27;key1&#x27;</span>, <span class="string">&#x27;def&#x27;</span>);</span><br><span class="line">在<span class="number">8.0</span><span class="number">.3</span>以后的版本</span><br><span class="line">是以重复键最后出现胜利原则</span><br><span class="line"><span class="operator">+</span><span class="comment">------------------------------------------------------+</span></span><br><span class="line"><span class="operator">|</span> <span class="built_in">JSON_OBJECT</span>(<span class="string">&#x27;key1&#x27;</span>, <span class="number">1</span>, <span class="string">&#x27;key2&#x27;</span>, <span class="string">&#x27;abc&#x27;</span>, <span class="string">&#x27;key1&#x27;</span>, <span class="string">&#x27;def&#x27;</span>) <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">------------------------------------------------------+</span></span><br><span class="line"><span class="operator">|</span> &#123;&quot;key1&quot;: &quot;def&quot;, &quot;key2&quot;: &quot;abc&quot;&#125;                       <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">------------------------------------------------------+</span></span><br><span class="line">在<span class="number">8.0</span><span class="number">.3</span> 以前的版本</span><br><span class="line">是以重复建最早出现胜利原则</span><br><span class="line"><span class="operator">+</span><span class="comment">------------------------------------------------------+</span></span><br><span class="line"><span class="operator">|</span> <span class="built_in">JSON_OBJECT</span>(<span class="string">&#x27;key1&#x27;</span>, <span class="number">1</span>, <span class="string">&#x27;key2&#x27;</span>, <span class="string">&#x27;abc&#x27;</span>, <span class="string">&#x27;key1&#x27;</span>, <span class="string">&#x27;def&#x27;</span>) <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">------------------------------------------------------+</span></span><br><span class="line"><span class="operator">|</span> &#123;&quot;key1&quot;: <span class="number">1</span>, &quot;key2&quot;: &quot;abc&quot;&#125;                           <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">------------------------------------------------------+</span></span><br><span class="line"></span><br></pre></td></tr></table></figure></p>
+<p>JSON值合并 (8.0.3版本开始支持)<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line">JSON_MERGE_PRESERVE() </span><br><span class="line">JSON_MERGE_PATCH()</span><br><span class="line">这<span class="number">2</span>个合并函数的不同在于对重复键的处理</span><br><span class="line">JSON_MERGE_PRESERVE() 是保留了重复键，并将值合并，JSON_MERGE_PATCH() 则保留重复键的最后一个。其他全部丢弃</span><br><span class="line">合并数组:</span><br><span class="line">mysql<span class="operator">&gt;</span> <span class="keyword">SELECT</span></span><br><span class="line">    <span class="operator">-</span><span class="operator">&gt;</span>   JSON_MERGE_PRESERVE(<span class="string">&#x27;[1, 2]&#x27;</span>, <span class="string">&#x27;[&quot;a&quot;, &quot;b&quot;, &quot;c&quot;]&#x27;</span>, <span class="string">&#x27;[true, false]&#x27;</span>) <span class="keyword">AS</span> Preserve,</span><br><span class="line">    <span class="operator">-</span><span class="operator">&gt;</span>   JSON_MERGE_PATCH(<span class="string">&#x27;[1, 2]&#x27;</span>, <span class="string">&#x27;[&quot;a&quot;, &quot;b&quot;, &quot;c&quot;]&#x27;</span>, <span class="string">&#x27;[true, false]&#x27;</span>) <span class="keyword">AS</span> Patch\G</span><br><span class="line"><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span> <span class="number">1.</span> <span class="type">row</span> <span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span></span><br><span class="line">Preserve: [<span class="number">1</span>, <span class="number">2</span>, &quot;a&quot;, &quot;b&quot;, &quot;c&quot;, <span class="literal">true</span>, <span class="literal">false</span>]</span><br><span class="line">   Patch: [<span class="literal">true</span>, <span class="literal">false</span>]</span><br><span class="line">在上面的例子中 JSON_MERGE_PATCH 将每个参数视为一个由单个元素组成的数组。因此其下标皆为<span class="number">0</span> 。根据最后优胜规则 ，结果就是[<span class="literal">true</span>,<span class="literal">false</span>]</span><br><span class="line"></span><br><span class="line">合并对象</span><br><span class="line">mysql<span class="operator">&gt;</span> <span class="keyword">SELECT</span></span><br><span class="line">    <span class="operator">-</span><span class="operator">&gt;</span>   JSON_MERGE_PRESERVE(<span class="string">&#x27;&#123;&quot;a&quot;: 1, &quot;b&quot;: 2&#125;&#x27;</span>, <span class="string">&#x27;&#123;&quot;c&quot;: 3, &quot;a&quot;: 4&#125;&#x27;</span>, <span class="string">&#x27;&#123;&quot;c&quot;: 5, &quot;d&quot;: 3&#125;&#x27;</span>) <span class="keyword">AS</span> Preserve,</span><br><span class="line">    <span class="operator">-</span><span class="operator">&gt;</span>   JSON_MERGE_PATCH(<span class="string">&#x27;&#123;&quot;a&quot;: 3, &quot;b&quot;: 2&#125;&#x27;</span>, <span class="string">&#x27;&#123;&quot;c&quot;: 3, &quot;a&quot;: 4&#125;&#x27;</span>, <span class="string">&#x27;&#123;&quot;c&quot;: 5, &quot;d&quot;: 3&#125;&#x27;</span>) <span class="keyword">AS</span> Patch\G</span><br><span class="line"><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span> <span class="number">1.</span> <span class="type">row</span> <span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span></span><br><span class="line">Preserve: &#123;&quot;a&quot;: [<span class="number">1</span>, <span class="number">4</span>], &quot;b&quot;: <span class="number">2</span>, &quot;c&quot;: [<span class="number">3</span>, <span class="number">5</span>], &quot;d&quot;: <span class="number">3</span>&#125;</span><br><span class="line">   Patch: &#123;&quot;a&quot;: <span class="number">4</span>, &quot;b&quot;: <span class="number">2</span>, &quot;c&quot;: <span class="number">5</span>, &quot;d&quot;: <span class="number">3</span>&#125;</span><br><span class="line">上面的例子中，我们可以看到对于重复键JSON_MERGE_PRESERVE保留key,并将其值合并成数组。而JSON_MERGE_PATCH遵循最后优胜规则，只保留重复key 的最后一个值</span><br><span class="line"></span><br><span class="line">mysql<span class="operator">&gt;</span> <span class="keyword">SELECT</span></span><br><span class="line">	  <span class="operator">-</span><span class="operator">&gt;</span>   JSON_MERGE_PRESERVE(<span class="string">&#x27;1&#x27;</span>, <span class="string">&#x27;2&#x27;</span>) <span class="keyword">AS</span> Preserve,</span><br><span class="line">	  <span class="operator">-</span><span class="operator">&gt;</span>   JSON_MERGE_PATCH(<span class="string">&#x27;1&#x27;</span>, <span class="string">&#x27;2&#x27;</span>) <span class="keyword">AS</span> Patch\G</span><br><span class="line"><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span> <span class="number">1.</span> <span class="type">row</span> <span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span></span><br><span class="line">Preserve: [<span class="number">1</span>, <span class="number">2</span>]</span><br><span class="line">   Patch: <span class="number">2</span></span><br><span class="line">非数组对象会被自动包装为数组对象。于是本例子中的JSON_MERGE_PATCH同样丢弃了第一个数组对象。仅保留<span class="number">2</span></span><br><span class="line">mysql<span class="operator">&gt;</span> <span class="keyword">SELECT</span></span><br><span class="line">	  <span class="operator">-</span><span class="operator">&gt;</span>   JSON_MERGE_PRESERVE(<span class="string">&#x27;[10, 20]&#x27;</span>, <span class="string">&#x27;&#123;&quot;a&quot;: &quot;x&quot;, &quot;b&quot;: &quot;y&quot;&#125;&#x27;</span>) <span class="keyword">AS</span> Preserve,</span><br><span class="line">	  <span class="operator">-</span><span class="operator">&gt;</span>   JSON_MERGE_PATCH(<span class="string">&#x27;[10, 20]&#x27;</span>, <span class="string">&#x27;&#123;&quot;a&quot;: &quot;x&quot;, &quot;b&quot;: &quot;y&quot;&#125;&#x27;</span>) <span class="keyword">AS</span> Patch\G</span><br><span class="line"><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span> <span class="number">1.</span> <span class="type">row</span> <span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span></span><br><span class="line">Preserve: [<span class="number">10</span>, <span class="number">20</span>, &#123;&quot;a&quot;: &quot;x&quot;, &quot;b&quot;: &quot;y&quot;&#125;]</span><br><span class="line">   Patch: &#123;&quot;a&quot;: &quot;x&quot;, &quot;b&quot;: &quot;y&quot;&#125;</span><br><span class="line">在混合数组和对象合并中。JSON_MERGE_PRESERVE将对象合并到数组中。而JSON_MERGE_PATCH则是将参数视为一个由单个元素组成的数组，这样就只保留最后一个参数</span><br><span class="line">可以说JSON_MERGE_PATCH 除了在多个json对象中合并对象里的每一个值。重复值就只保留最后一个。在其他情况下，只返回最后一个参数的值</span><br></pre></td></tr></table></figure></p>
+<p>查找JSON值<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br></pre></td><td class="code"><pre><span class="line">json值的查找路径</span><br><span class="line">$为根 </span><br><span class="line">$[n],表示第n<span class="operator">+</span><span class="number">1</span>个对象，下标从<span class="number">0</span> 开始</span><br><span class="line">$[n].key 表示第n<span class="operator">+</span><span class="number">1</span>个对象中指定key的值,当json值只有一个json 对象 可以写成 $.key 。存在多个对象而写成$.key 将返回<span class="keyword">NULL</span></span><br><span class="line">$[n].key[n] 表示第n<span class="operator">+</span><span class="number">1</span>个对象中指定key的值,key[n] 中的n 表示key 值里面第n<span class="operator">+</span><span class="number">1</span>个元素</span><br><span class="line">$.<span class="operator">*</span> 表示将对象的所有值组成一个数组返回</span><br><span class="line">$<span class="operator">*</span><span class="operator">*</span>.key 表示将对象的所有值中的key对应的值组成一个数组返回</span><br><span class="line">$[m <span class="keyword">to</span> n] 表示在json数组中获取一段连续的元素</span><br><span class="line">$[<span class="keyword">last</span>] 表示json数组中最后一个元素</span><br><span class="line"></span><br><span class="line"><span class="keyword">SELECT</span> JSON_EXTRACT(<span class="string">&#x27;[3, &#123;&quot;a&quot;: [5, 6], &quot;b&quot;: 10&#125;, [99, 100]]&#x27;</span>,<span class="string">&#x27;$[0]&#x27;</span>)</span><br><span class="line">$[<span class="number">0</span>] 表示第一个json元素</span><br><span class="line">JSON_EXTRACT(<span class="string">&#x27;[3, &#123;&quot;a&quot;: [5, 6], &quot;b&quot;: 10&#125;, [99, 100]]&#x27;</span>,<span class="string">&#x27;$[0]&#x27;</span>)<span class="operator">|</span></span><br><span class="line"><span class="comment">-------------------------------------------------------------+</span></span><br><span class="line"><span class="number">3</span>                                                            <span class="operator">|</span></span><br><span class="line"><span class="keyword">SELECT</span> JSON_EXTRACT(<span class="string">&#x27;[3, &#123;&quot;a&quot;: [5, 6], &quot;b&quot;: 10&#125;, [99, 100]]&#x27;</span>,<span class="string">&#x27;$[1].a&#x27;</span>)</span><br><span class="line">$[<span class="number">1</span>].a 表示第二个元素里面key为a的值</span><br><span class="line">JSON_EXTRACT(<span class="string">&#x27;[3, &#123;&quot;a&quot;: [5, 6], &quot;b&quot;: 10&#125;, [99, 100]]&#x27;</span>,<span class="string">&#x27;$[1].a&#x27;</span>)<span class="operator">|</span></span><br><span class="line"><span class="comment">---------------------------------------------------------------+</span></span><br><span class="line">[<span class="number">5</span>, <span class="number">6</span>]                                                         <span class="operator">|</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">SELECT</span> JSON_EXTRACT(<span class="string">&#x27;[3, &#123;&quot;a&quot;: [5, 6], &quot;b&quot;: 10&#125;, [99, 100]]&#x27;</span>,<span class="string">&#x27;$[1].a[1]&#x27;</span>)</span><br><span class="line">$[<span class="number">1</span>].a[<span class="number">1</span>] 表示第二个元素里面key为a的值里面的第二个元素</span><br><span class="line">JSON_EXTRACT(<span class="string">&#x27;[3, &#123;&quot;a&quot;: [5, 6], &quot;b&quot;: 10&#125;, [99, 100]]&#x27;</span>,<span class="string">&#x27;$[1].a[1]&#x27;</span>)<span class="operator">|</span></span><br><span class="line"><span class="comment">------------------------------------------------------------------+</span></span><br><span class="line"><span class="number">6</span>                                                                 <span class="operator">|</span></span><br><span class="line"><span class="keyword">SELECT</span> JSON_EXTRACT(<span class="string">&#x27;&#123;&quot;a&quot;: 1, &quot;b&quot;: 2, &quot;c&quot;: [3, 4, 5]&#125;&#x27;</span>, <span class="string">&#x27;$.*&#x27;</span>)</span><br><span class="line">$.<span class="operator">*</span> 仅用于只有一个json对象中，将对象中所有的值以数组返回</span><br><span class="line">Name                                                   <span class="operator">|</span><span class="keyword">Value</span>            <span class="operator">|</span></span><br><span class="line"><span class="comment">-------------------------------------------------------+-----------------+</span></span><br><span class="line">JSON_EXTRACT(<span class="string">&#x27;&#123;&quot;a&quot;: 1, &quot;b&quot;: 2, &quot;c&quot;: [3, 4, 5]&#125;&#x27;</span>, <span class="string">&#x27;$.*&#x27;</span>)<span class="operator">|</span>[<span class="number">1</span>, <span class="number">2</span>, [<span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>]]<span class="operator">|</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">SELECT</span> JSON_EXTRACT(<span class="string">&#x27;&#123;&quot;a&quot;: &#123;&quot;b&quot;: 1&#125;, &quot;c&quot;: &#123;&quot;b&quot;: 2&#125;&#125;&#x27;</span>, <span class="string">&#x27;$**.b&#x27;</span>);</span><br><span class="line">$.<span class="operator">*</span><span class="operator">*</span>.b 表示第一层的<span class="keyword">value</span>中的key<span class="operator">=</span>b 的值以数组的形式返回 </span><br><span class="line">Name                                                   <span class="operator">|</span><span class="keyword">Value</span> <span class="operator">|</span></span><br><span class="line"><span class="comment">-------------------------------------------------------+------+</span></span><br><span class="line">JSON_EXTRACT(<span class="string">&#x27;&#123;&quot;a&quot;: &#123;&quot;b&quot;: 1&#125;, &quot;c&quot;: &#123;&quot;b&quot;: 2&#125;&#125;&#x27;</span>, <span class="string">&#x27;$**.b&#x27;</span>)<span class="operator">|</span>[<span class="number">1</span>, <span class="number">2</span>]<span class="operator">|</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">SELECT</span> JSON_EXTRACT(<span class="string">&#x27;[1, 2, 3, 4, 5]&#x27;</span>, <span class="string">&#x27;$[1 to 3]&#x27;</span>);</span><br><span class="line">$[<span class="number">1</span> <span class="keyword">to</span> <span class="number">3</span>] 对于json 数组可以通过 n <span class="keyword">to</span> m 的方式获数组中连续的一段值，表示获取从第<span class="number">2</span>到第<span class="number">4</span>个元素</span><br><span class="line">Name                                        <span class="operator">|</span><span class="keyword">Value</span>    <span class="operator">|</span></span><br><span class="line"><span class="comment">--------------------------------------------+---------+</span></span><br><span class="line">JSON_EXTRACT(<span class="string">&#x27;[1, 2, 3, 4, 5]&#x27;</span>, <span class="string">&#x27;$[1 to 3]&#x27;</span>)<span class="operator">|</span>[<span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>]<span class="operator">|</span></span><br><span class="line">$[<span class="keyword">last</span>] 则表示数组的最后一个元素。$[<span class="keyword">last</span> <span class="number">-3</span> <span class="keyword">to</span> <span class="keyword">last</span> <span class="number">-1</span>] 表示从倒数第<span class="number">4</span>个元素到倒数第<span class="number">2</span>个元素</span><br></pre></td></tr></table></figure></p>
+<p>修改JSON的值<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line">JSON_SET() 函数</span><br><span class="line"><span class="keyword">SET</span> <span class="variable">@j</span> <span class="operator">=</span> <span class="string">&#x27;[&quot;a&quot;, &#123;&quot;b&quot;: [true, false]&#125;, [10, 20]]&#x27;</span>;</span><br><span class="line"><span class="keyword">SELECT</span> JSON_SET(<span class="variable">@j</span>, <span class="string">&#x27;$[1].b[0]&#x27;</span>, <span class="number">1</span>, <span class="string">&#x27;$[2][2]&#x27;</span>, <span class="number">2</span>);</span><br><span class="line">$[<span class="number">1</span>].b[<span class="number">0</span>] 将第<span class="number">2</span>个元素key<span class="operator">=</span>b 的第<span class="number">1</span>个元素修改为<span class="number">1</span>，将第<span class="number">3</span>个元素的值中第<span class="number">3</span>个值设置为<span class="number">2</span></span><br><span class="line">JSON_SET(<span class="variable">@j</span>, <span class="string">&#x27;$[1].b[0]&#x27;</span>, <span class="number">1</span>, <span class="string">&#x27;$[2][2]&#x27;</span>, <span class="number">2</span>)<span class="operator">|</span></span><br><span class="line"><span class="comment">------------------------------------------+</span></span><br><span class="line">[&quot;a&quot;, &#123;&quot;b&quot;: [<span class="number">1</span>, <span class="literal">false</span>]&#125;, [<span class="number">10</span>, <span class="number">20</span>, <span class="number">2</span>]]     <span class="operator">|</span></span><br><span class="line">从结果中我们可以看到 $[<span class="number">1</span>]  对应的是 &#123;&quot;b&quot;: [<span class="literal">true</span>, <span class="literal">false</span>]&#125;, $[<span class="number">1</span>].b[<span class="number">0</span>] 对应的是<span class="literal">true</span> 被修改成<span class="number">1</span>，而第<span class="number">3</span>个元素[<span class="number">10</span>, <span class="number">20</span>]没有下标为<span class="number">2</span>的数据。则新增了一个<span class="number">2</span></span><br><span class="line">JSON_SET() 既更新旧值也插入新值</span><br><span class="line"></span><br><span class="line">JSON_INSERT() 函数</span><br><span class="line"><span class="keyword">SET</span> <span class="variable">@j</span> <span class="operator">=</span> <span class="string">&#x27;[&quot;a&quot;, &#123;&quot;b&quot;: [true, false]&#125;, [10, 20]]&#x27;</span>;</span><br><span class="line"><span class="keyword">SELECT</span> JSON_INSERT(<span class="variable">@j</span>, <span class="string">&#x27;$[1].b[0]&#x27;</span>, <span class="number">1</span>, <span class="string">&#x27;$[2][2]&#x27;</span>, <span class="number">2</span>);</span><br><span class="line">JSON_INSERT(<span class="variable">@j</span>, <span class="string">&#x27;$[1].b[0]&#x27;</span>, <span class="number">1</span>, <span class="string">&#x27;$[2][2]&#x27;</span>, <span class="number">2</span>)<span class="operator">|</span></span><br><span class="line"><span class="comment">---------------------------------------------+</span></span><br><span class="line">[&quot;a&quot;, &#123;&quot;b&quot;: [<span class="literal">true</span>, <span class="literal">false</span>]&#125;, [<span class="number">10</span>, <span class="number">20</span>, <span class="number">2</span>]]     <span class="operator">|</span></span><br><span class="line">从结果中可以看到JSON_INSERT()是插入新的值而不更新旧值</span><br><span class="line"></span><br><span class="line">JSON_PLACE() 函数</span><br><span class="line"><span class="keyword">SET</span> <span class="variable">@j</span> <span class="operator">=</span> <span class="string">&#x27;[&quot;a&quot;, &#123;&quot;b&quot;: [true, false]&#125;, [10, 20]]&#x27;</span>;</span><br><span class="line"><span class="keyword">SELECT</span> JSON_REPLACE(<span class="variable">@j</span>, <span class="string">&#x27;$[1].b[0]&#x27;</span>, <span class="number">1</span>, <span class="string">&#x27;$[2][2]&#x27;</span>, <span class="number">2</span>);</span><br><span class="line">JSON_REPLACE(<span class="variable">@j</span>, <span class="string">&#x27;$[1].b[0]&#x27;</span>, <span class="number">1</span>, <span class="string">&#x27;$[2][2]&#x27;</span>, <span class="number">2</span>)<span class="operator">|</span></span><br><span class="line"><span class="comment">----------------------------------------------+</span></span><br><span class="line">[&quot;a&quot;, &#123;&quot;b&quot;: [<span class="number">1</span>, <span class="literal">false</span>]&#125;, [<span class="number">10</span>, <span class="number">20</span>]]            <span class="operator">|</span></span><br><span class="line">从结果中可以看到JSON_PLACE()只更新旧值，不插入新值</span><br><span class="line"></span><br><span class="line">JSON_REMOVE() 函数</span><br><span class="line"><span class="keyword">SET</span> <span class="variable">@j</span> <span class="operator">=</span> <span class="string">&#x27;[&quot;a&quot;, &#123;&quot;b&quot;: [true, false]&#125;, [10, 20]]&#x27;</span>;</span><br><span class="line"><span class="keyword">SELECT</span> JSON_REMOVE(<span class="variable">@j</span>, <span class="string">&#x27;$[2]&#x27;</span>, <span class="string">&#x27;$[1].b[1]&#x27;</span>, <span class="string">&#x27;$[1].b[1]&#x27;</span>);</span><br><span class="line">JSON_REMOVE(<span class="variable">@j</span>, <span class="string">&#x27;$[2]&#x27;</span>, <span class="string">&#x27;$[1].b[1]&#x27;</span>, <span class="string">&#x27;$[1].b[1]&#x27;</span>)<span class="operator">|</span></span><br><span class="line"><span class="comment">-------------------------------------------------+</span></span><br><span class="line">[&quot;a&quot;, &#123;&quot;b&quot;: [<span class="literal">true</span>]&#125;]                             <span class="operator">|</span></span><br><span class="line">从结果集可以看到，根据参数指定的的多个path 进行元素移除</span><br><span class="line">第<span class="number">1</span>个参数，$[<span class="number">2</span>] 即 [<span class="number">10</span>, <span class="number">20</span>] 被移除</span><br><span class="line">第<span class="number">2</span>个参数，$[<span class="number">1</span>].b[<span class="number">1</span>] 即  &#123;&quot;b&quot;: [<span class="literal">true</span>, <span class="literal">false</span>]&#125; 中的<span class="literal">false</span> 也被移除</span><br><span class="line">第<span class="number">3</span>个参数，$[<span class="number">1</span>].b[<span class="number">1</span>] 即  &#123;&quot;b&quot;: [<span class="literal">true</span>, <span class="literal">false</span>]&#125; 中的<span class="literal">false</span> 因为在第<span class="number">2</span>步已经被移除。所以找不到。将不起任何作用</span><br></pre></td></tr></table></figure></p>
+<p>JSON 类型值的比较<br>JSON 类型值可以通过 =, &lt;, &lt;=, &gt;, &gt;=, &lt;&gt;, !=, 和 &lt;=&gt; 这些操作符比较<br>BETWEEN IN() GREATEST() LEAST() 这些比较操作跟函数暂时不被支持</p>
+<p>以下列表显示了JSON类型的优先级，从最高优先级到最低优先级。（类型名称是由JSON_type（）函数返回的名称。）一行中显示在一起的类型具有相同的优先级。列表中较早列出的JSON类型的任何值都比列表中较晚列出的任何JSON类型的值大。<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">BLOB</span></span><br><span class="line">  比较两个值的前N个字节，其中N是较短值中的字节数。如果两个值的前N个字节相同，则将较短的值排列在较长的值之前</span><br><span class="line">BIT</span><br><span class="line">  与<span class="type">BLOB</span>相同的规则</span><br><span class="line">OPAQUE</span><br><span class="line">  与<span class="type">BLOB</span>相同的规则。OPAQUE值是未分类为其他类型之一的值</span><br><span class="line">DATETIME</span><br><span class="line">  表示较早时间点的值在表示较晚时间点的数值之前排序。如果两个值最初分别来自MySQL DATETIME和<span class="type">TIMESTAMP</span>类型，那么如果它们表示相同的时间点，则它们是相等的。</span><br><span class="line"><span class="type">TIME</span></span><br><span class="line">  两个时间值中较小的一个按顺序排列在较大的一个之前。</span><br><span class="line"><span class="type">DATE</span></span><br><span class="line">  较早的日期在最近的日期之前排序。</span><br><span class="line"><span class="type">BOOLEAN</span></span><br><span class="line">  <span class="literal">false</span> 比 <span class="literal">true</span> 小</span><br><span class="line"><span class="keyword">ARRAY</span></span><br><span class="line">  <span class="number">2</span>个数组如果他们的长度和元素顺序都相同。则相等。否则则有存在差异的第一个元素的大小为准。首先以该位置较小的那个数组排在前面。如果一个较短的数组所有值与较长的数组的前N个相同。则较短的排在前面</span><br><span class="line">OBJECT</span><br><span class="line">  <span class="number">2</span>个对象具有相同的key 并且key 对应的值相同。则<span class="number">2</span>个对象相等。<span class="number">2</span>个不相等的对象其排序具有不确定性</span><br><span class="line">STRING</span><br><span class="line">  字符串在被比较的两个字符串的utf8mb4表示的前N个字节上按词法排序，其中N是较短字符串的长度。如果两个字符串的前N个字节相同，则认为较短的字符串小于较长的字符串。</span><br><span class="line"><span class="type">INTEGER</span>, <span class="keyword">DOUBLE</span></span><br><span class="line">  如果是mysql 内置的数值型类型则按数值型的排序方式。如果无法确定其类型。mysql将其转化为精准的数值型再进行比较</span><br><span class="line"><span class="keyword">NULL</span></span><br><span class="line">  </span><br></pre></td></tr></table></figure></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/json/" rel="tag"># json</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/03/30/sed/" rel="prev" title="sed 使用">
+      <i class="fa fa-chevron-left"></i> sed 使用
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/04/06/ShellDateAdd/" rel="next" title="Shell的日期加减操作">
+      Shell的日期加减操作 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Sheen</p>
+  <div class="site-description" itemprop="description">数据库相关技术研究,自动化运维</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">36</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">12</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">47</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Sheen</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/pjax/pjax.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[data-pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.dataset.pjax !== undefined) {
+      script.dataset.pjax = '';
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '78f8e6427a00d33b1454',
+      clientSecret: 'df55248398c379200efd40824ecae2d9fd208e20',
+      repo        : 'sheenzxx.github.io',
+      owner       : 'sheenzxx',
+      admin       : ['sheenzxx'],
+      id          : '4064a6a33b2ee75bfbbbe2b60d49ec42',
+        language: 'zh-CN',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+    </div>
+</body>
+</html>
