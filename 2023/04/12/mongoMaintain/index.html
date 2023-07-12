@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"sheenzxx.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"gitalk","storage":true,"lazyload":false,"nav":null,"activeClass":"gitalk"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="登录数据库123456789[wuiprd@WCN-GZP-WUIMDB1 ~]$ mongoMongoDB shell version v4.4.16connecting to: mongodb:&#x2F;&#x2F;127.0.0.1:3717&#x2F;?compressors&#x3D;disabled&amp;gssapiServiceName&#x3D;mongodbImplicit session: session &amp;#123;">
+<meta property="og:type" content="article">
+<meta property="og:title" content="mongodb运维一些相关命令">
+<meta property="og:url" content="https://sheenzxx.github.io/2023/04/12/mongoMaintain/index.html">
+<meta property="og:site_name" content="sheen&#39;s Blog">
+<meta property="og:description" content="登录数据库123456789[wuiprd@WCN-GZP-WUIMDB1 ~]$ mongoMongoDB shell version v4.4.16connecting to: mongodb:&#x2F;&#x2F;127.0.0.1:3717&#x2F;?compressors&#x3D;disabled&amp;gssapiServiceName&#x3D;mongodbImplicit session: session &amp;#123;">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2023-04-12T03:00:08.000Z">
+<meta property="article:modified_time" content="2023-07-12T07:58:15.875Z">
+<meta property="article:author" content="Sheen">
+<meta property="article:tag" content="replica set">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://sheenzxx.github.io/2023/04/12/mongoMaintain/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>mongodb运维一些相关命令 | sheen's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="sheen's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">sheen's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">随笔，技术笔记</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/home/" rel="section"><i class="home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://sheenzxx.github.io/2023/04/12/mongoMaintain/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Sheen">
+      <meta itemprop="description" content="数据库相关技术研究,自动化运维">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="sheen's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          mongodb运维一些相关命令
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2023-04-12 11:00:08" itemprop="dateCreated datePublished" datetime="2023-04-12T11:00:08+08:00">2023-04-12</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2023-07-12 15:58:15" itemprop="dateModified" datetime="2023-07-12T15:58:15+08:00">2023-07-12</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/mongodb/" itemprop="url" rel="index"><span itemprop="name">mongodb</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>登录数据库<br><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">[wuiprd@WCN-GZP-WUIMDB1 ~]$ mongo</span><br><span class="line">MongoDB shell version v4.4.16</span><br><span class="line">connecting to: mongodb://127.0.0.1:3717/?compressors=disabled&amp;gssapiServiceName=mongodb</span><br><span class="line">Implicit session: session &#123; &quot;id&quot; : UUID(&quot;df6155be-e08c-4c62-a9be-ad653471eb22&quot;) &#125;</span><br><span class="line">MongoDB server version: 4.4.16</span><br><span class="line">Mmp_wuid:PRIMARY&gt; use admin</span><br><span class="line">switched to db admin</span><br><span class="line">Mmp_wuid:PRIMARY&gt; db.auth(&#x27;root&#x27;,&#x27;xxxxx&#x27;)</span><br><span class="line">1</span><br></pre></td></tr></table></figure><br>查看数据库<br><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Mmp_wuid:PRIMARY&gt; show dbs;</span><br></pre></td></tr></table></figure><br>查看从库信息<br><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Mmp_wuid:PRIMARY&gt; db.printSecondaryReplicationInfo()</span><br></pre></td></tr></table></figure><br>修改从库的权重<br><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br></pre></td><td class="code"><pre><span class="line">Mmp_wuid:PRIMARY&gt; rs.conf()    #查看集群配置详情</span><br><span class="line"></span><br><span class="line">&#123;</span><br><span class="line">&quot;_id&quot; : &quot;Mmp_wuid&quot;,</span><br><span class="line">&quot;version&quot; : 3,</span><br><span class="line">&quot;term&quot; : 16,</span><br><span class="line">&quot;protocolVersion&quot; : NumberLong(1),</span><br><span class="line">&quot;writeConcernMajorityJournalDefault&quot; : true,</span><br><span class="line">&quot;members&quot; : [</span><br><span class="line">&#123;</span><br><span class="line">&quot;_id&quot; : 0,</span><br><span class="line">&quot;host&quot; : &quot;10.82.49.101:3717&quot;,</span><br><span class="line">&quot;arbiterOnly&quot; : false,</span><br><span class="line">&quot;buildIndexes&quot; : true,</span><br><span class="line">&quot;hidden&quot; : false,</span><br><span class="line">&quot;priority&quot; : 2,</span><br><span class="line">&quot;tags&quot; : &#123;</span><br><span class="line"></span><br><span class="line">&#125;,</span><br><span class="line">&quot;slaveDelay&quot; : NumberLong(0),</span><br><span class="line">&quot;votes&quot; : 1</span><br><span class="line">&#125;,</span><br><span class="line">&#123;</span><br><span class="line">&quot;_id&quot; : 1,</span><br><span class="line">&quot;host&quot; : &quot;10.82.49.102:3717&quot;,</span><br><span class="line">&quot;arbiterOnly&quot; : false,</span><br><span class="line">&quot;buildIndexes&quot; : true,</span><br><span class="line">&quot;hidden&quot; : false,</span><br><span class="line">&quot;priority&quot; : 1,</span><br><span class="line">&quot;tags&quot; : &#123;</span><br><span class="line"></span><br><span class="line">&#125;,</span><br><span class="line">&quot;slaveDelay&quot; : NumberLong(0),</span><br><span class="line">&quot;votes&quot; : 1</span><br><span class="line">&#125;,</span><br><span class="line">&#123;</span><br><span class="line">&quot;_id&quot; : 2,</span><br><span class="line">&quot;host&quot; : &quot;10.82.49.103:3717&quot;,</span><br><span class="line">&quot;arbiterOnly&quot; : true,</span><br><span class="line">&quot;buildIndexes&quot; : true,</span><br><span class="line">&quot;hidden&quot; : false,</span><br><span class="line">&quot;priority&quot; : 0,</span><br><span class="line">&quot;tags&quot; : &#123;</span><br><span class="line"></span><br><span class="line">&#125;,</span><br><span class="line">&quot;slaveDelay&quot; : NumberLong(0),</span><br><span class="line">&quot;votes&quot; : 1</span><br><span class="line">&#125;</span><br><span class="line">],</span><br><span class="line">&quot;settings&quot; : &#123;</span><br><span class="line">&quot;chainingAllowed&quot; : true,</span><br><span class="line">&quot;heartbeatIntervalMillis&quot; : 2000,</span><br><span class="line">&quot;heartbeatTimeoutSecs&quot; : 10,</span><br><span class="line">&quot;electionTimeoutMillis&quot; : 10000,</span><br><span class="line">&quot;catchUpTimeoutMillis&quot; : -1,</span><br><span class="line">&quot;catchUpTakeoverDelayMillis&quot; : 30000,</span><br><span class="line">&quot;getLastErrorModes&quot; : &#123;</span><br><span class="line"></span><br><span class="line">&#125;,</span><br><span class="line">&quot;getLastErrorDefaults&quot; : &#123;</span><br><span class="line">&quot;w&quot; : 1,</span><br><span class="line">&quot;wtimeout&quot; : 0</span><br><span class="line">&#125;,</span><br><span class="line">&quot;replicaSetId&quot; : ObjectId(&quot;63082f54832262d25063ec05&quot;)</span><br><span class="line">&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><br>在维护过程中，可能需要重启主库，但又不想让重启主库时发生切换。这个时候我们需要修改slave 的优先级。让它检测到主库重启也不切换。<br>在配置中可以看到从库 对应members列表中_id=1 的配置，其priority = 1，我们需要改为0，操作如下<br><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Mmp_wuid:PRIMARY&gt; cfg = rs.conf()     #导入配置</span><br><span class="line"></span><br><span class="line">Mmp_wuid:PRIMARY&gt; cfg.members[1].priority=0    #修改优先级</span><br><span class="line"></span><br><span class="line">Mmp_wuid:PRIMARY&gt; rs.reconfig(cfg)    #重新配置</span><br></pre></td></tr></table></figure><br>查看monogdb 缓存cache_size 大小<br><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Mmp_wuid:PRIMARY&gt; db.serverStatus().wiredTiger.cache[&#x27;maximum bytes configured&#x27;]/1024/1024/1024</span><br><span class="line">20</span><br></pre></td></tr></table></figure><br>修改cache_size 大小<br><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Mmp_wuid:PRIMARY&gt; db.adminCommand( &#123; &quot;setParameter&quot;: 1, &quot;wiredTigerEngineRuntimeConfig&quot;: &quot;cache_size=20G&quot;&#125;)</span><br></pre></td></tr></table></figure></p>
+<p>查看当前连接数信息<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">Mmp_wuid:PRIMARY&gt; db.serverStatus().connections;</span><br><span class="line">&#123;</span><br><span class="line">&quot;current&quot; : 19,</span><br><span class="line">&quot;available&quot; : 51181,</span><br><span class="line">&quot;totalCreated&quot; : 5787,</span><br><span class="line">&quot;active&quot; : 4,</span><br><span class="line">&quot;exhaustIsMaster&quot; : 1,</span><br><span class="line">&quot;exhaustHello&quot; : 1,</span><br><span class="line">&quot;awaitingTopologyChanges&quot; : 35</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>查看连接详情<br><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Mmp_wuid:PRIMARY&gt; db.currentOp(&#123;&quot;op&quot; : &quot;insert&quot;,&quot;active&quot; : true&#125;)  #查询op 操作是insert ，并且状态是活跃的连接详情</span><br><span class="line"></span><br><span class="line">Mmp_wuid:PRIMARY&gt; db.currentOp(&#123;&quot;secs_running&quot; : &#123;&quot;$gt&quot;:5&#125;&#125;)    #查询运行时间超过5秒的连接详情</span><br><span class="line"></span><br><span class="line">Mmp_wuid:PRIMARY&gt;  db.currentOp(&#123;&quot;secs_running&quot; : &#123;&quot;$gt&quot;:5&#125;&#125;).inprog.forEach(function(item)&#123;db.killOp(item.opid)&#125;) #查询超过5秒的连接并杀掉</span><br></pre></td></tr></table></figure></p>
+<p>获取当前数据库操作统计<br><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">mgset-54903079 [direct: primary] wuid&gt; db.serverStatus().opcounters</span><br><span class="line">&#123;</span><br><span class="line">  insert: Long(&quot;1638687567&quot;),</span><br><span class="line">  query: Long(&quot;2145547252&quot;),</span><br><span class="line">  update: Long(&quot;2074042631&quot;),</span><br><span class="line">  delete: Long(&quot;778119&quot;),</span><br><span class="line">  getmore: Long(&quot;3597908695&quot;),</span><br><span class="line">  command: Long(&quot;4173516698&quot;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>查看是否具有全表扫描的操作<br><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">[mongos] wuid&gt; db.currentOp(&#123;planSummary: &#x27;COLLSCAN&#x27;&#125;)</span><br><span class="line">&#123;</span><br><span class="line">  inprog: [</span><br><span class="line">    &#123;</span><br><span class="line">      ...</span><br><span class="line">      active: true,</span><br><span class="line">      currentOpTime: &#x27;2023-06-27T10:50:10.861+0800&#x27;,</span><br><span class="line">      effectiveUsers: [ &#123; user: &#x27;__system&#x27;, db: &#x27;local&#x27; &#125; ],</span><br><span class="line">      opid: &#x27;d-wz9efd20b71ae404:210659684&#x27;,</span><br><span class="line">      secs_running: Long(&quot;0&quot;),</span><br><span class="line">      microsecs_running: Long(&quot;64337&quot;),</span><br><span class="line">      op: &#x27;getmore&#x27;,</span><br><span class="line">      ns: &#x27;local.oplog.rs&#x27;,</span><br><span class="line">      command:&#123;...&#125;</span><br><span class="line">      planSummary: &#x27;COLLSCAN&#x27;,</span><br><span class="line">      ...</span><br><span class="line">    &#125;</span><br><span class="line">  ]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<h1 id="启动mongodb"><a href="#启动mongodb" class="headerlink" title="启动mongodb"></a>启动mongodb</h1><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo systemctl start mongod.service</span><br></pre></td></tr></table></figure>
+<h1 id="停用mongodb"><a href="#停用mongodb" class="headerlink" title="停用mongodb"></a>停用mongodb</h1><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo systemctl stop mongod.service</span><br></pre></td></tr></table></figure>
+<h1 id="查看启动结果"><a href="#查看启动结果" class="headerlink" title="查看启动结果"></a>查看启动结果</h1><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo systemctl status mongod.service</span><br></pre></td></tr></table></figure>
+<p>启动过程中因为mongodb 处理回滚时间过长。导致启动到一半就被杀死终止<br><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:09:46.546+08:00&quot;&#125;,&quot;s&quot;:&quot;I&quot;, &quot;c&quot;:&quot;COMMAND&quot;, &quot;id&quot;:51803, &quot;ctx&quot;:&quot;conn4539024&quot;,&quot;msg&quot;:&quot;Slow query&quot;,&quot;attr&quot;:&#123;&quot;type&quot;:&quot;command&quot;,&quot;ns&quot;:&quot;wuid.tmp_repeat_unionId&quot;,&quot;command&quot;:&#123;&quot;insert&quot;:&quot;tmp_repeat_unionId&quot;,&quot;ordered&quot;:false,&quot;bypassDocumentValidation&quot;:true,&quot;$db&quot;:&quot;wuid&quot;&#125;,&quot;ninserted&quot;:128,&quot;keysInserted&quot;:128,&quot;numYields&quot;:0,&quot;reslen&quot;:245,&quot;locks&quot;:&#123;&quot;ParallelBatchWriterMode&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;r&quot;:1&#125;&#125;,&quot;FeatureCompatibilityVersion&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;w&quot;:1&#125;&#125;,&quot;ReplicationStateTransition&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;w&quot;:1&#125;&#125;,&quot;Global&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;w&quot;:1&#125;&#125;,&quot;Database&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;w&quot;:1&#125;&#125;,&quot;Collection&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;w&quot;:1&#125;&#125;,&quot;Mutex&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;r&quot;:1&#125;&#125;&#125;,&quot;flowControl&quot;:&#123;&quot;acquireCount&quot;:1,&quot;acquireWaitCount&quot;:1,&quot;timeAcquiringMicros&quot;:985762&#125;,&quot;storage&quot;:&#123;&#125;,&quot;protocol&quot;:&quot;op_query&quot;,&quot;durationMillis&quot;:988&#125;&#125;</span><br><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:09:46.546+08:00&quot;&#125;,&quot;s&quot;:&quot;I&quot;, &quot;c&quot;:&quot;COMMAND&quot;, &quot;id&quot;:51803, &quot;ctx&quot;:&quot;conn4539022&quot;,&quot;msg&quot;:&quot;Slow query&quot;,&quot;attr&quot;:&#123;&quot;type&quot;:&quot;command&quot;,&quot;ns&quot;:&quot;wuid.tmp_to_id_unionId&quot;,&quot;command&quot;:&#123;&quot;insert&quot;:&quot;tmp_to_id_unionId&quot;,&quot;ordered&quot;:false,&quot;bypassDocumentValidation&quot;:true,&quot;$db&quot;:&quot;wuid&quot;&#125;,&quot;ninserted&quot;:128,&quot;keysInserted&quot;:128,&quot;numYields&quot;:0,&quot;reslen&quot;:245,&quot;locks&quot;:&#123;&quot;ParallelBatchWriterMode&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;r&quot;:1&#125;&#125;,&quot;FeatureCompatibilityVersion&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;w&quot;:1&#125;&#125;,&quot;ReplicationStateTransition&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;w&quot;:1&#125;&#125;,&quot;Global&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;w&quot;:1&#125;&#125;,&quot;Database&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;w&quot;:1&#125;&#125;,&quot;Collection&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;w&quot;:1&#125;&#125;,&quot;Mutex&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;r&quot;:1&#125;&#125;&#125;,&quot;flowControl&quot;:&#123;&quot;acquireCount&quot;:1,&quot;acquireWaitCount&quot;:1,&quot;timeAcquiringMicros&quot;:971338&#125;,&quot;storage&quot;:&#123;&#125;,&quot;protocol&quot;:&quot;op_query&quot;,&quot;durationMillis&quot;:974&#125;&#125;</span><br><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:09:47.488+08:00&quot;&#125;,&quot;s&quot;:&quot;I&quot;, &quot;c&quot;:&quot;COMMAND&quot;, &quot;id&quot;:20482, &quot;ctx&quot;:&quot;conn4538701&quot;,&quot;msg&quot;:&quot;Going to kill op&quot;,&quot;attr&quot;:&#123;&quot;opId&quot;:1071745126&#125;&#125;</span><br><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:09:47.488+08:00&quot;&#125;,&quot;s&quot;:&quot;I&quot;, &quot;c&quot;:&quot;COMMAND&quot;, &quot;id&quot;:20884, &quot;ctx&quot;:&quot;conn4538701&quot;,&quot;msg&quot;:&quot;Killed operation&quot;,&quot;attr&quot;:&#123;&quot;opId&quot;:1071745126&#125;&#125;</span><br><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:09:47.558+08:00&quot;&#125;,&quot;s&quot;:&quot;I&quot;, &quot;c&quot;:&quot;COMMAND&quot;, &quot;id&quot;:51803, &quot;ctx&quot;:&quot;conn4539024&quot;,&quot;msg&quot;:&quot;Slow query&quot;,&quot;attr&quot;:&#123;&quot;type&quot;:&quot;command&quot;,&quot;ns&quot;:&quot;wuid.tmp_wuid_test&quot;,&quot;command&quot;:&#123;&quot;insert&quot;:&quot;tmp_wuid_test&quot;,&quot;ordered&quot;:false,&quot;bypassDocumentValidation&quot;:true,&quot;$db&quot;:&quot;wuid&quot;&#125;,&quot;ninserted&quot;:128,&quot;keysInserted&quot;:128,&quot;numYields&quot;:0,&quot;reslen&quot;:245,&quot;locks&quot;:&#123;&quot;ParallelBatchWriterMode&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;r&quot;:1&#125;&#125;,&quot;FeatureCompatibilityVersion&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;w&quot;:1&#125;&#125;,&quot;ReplicationStateTransition&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;w&quot;:1&#125;&#125;,&quot;Global&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;w&quot;:1&#125;&#125;,&quot;Database&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;w&quot;:1&#125;&#125;,&quot;Collection&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;w&quot;:1&#125;&#125;,&quot;Mutex&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;r&quot;:1&#125;&#125;&#125;,&quot;flowControl&quot;:&#123;&quot;acquireCount&quot;:1,&quot;acquireWaitCount&quot;:1,&quot;timeAcquiringMicros&quot;:986487&#125;,&quot;storage&quot;:&#123;&#125;,&quot;protocol&quot;:&quot;op_query&quot;,&quot;durationMillis&quot;:989&#125;&#125;</span><br><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:09:47.568+08:00&quot;&#125;,&quot;s&quot;:&quot;I&quot;, &quot;c&quot;:&quot;COMMAND&quot;, &quot;id&quot;:51803, &quot;ctx&quot;:&quot;conn4539022&quot;,&quot;msg&quot;:&quot;Slow query&quot;,&quot;attr&quot;:&#123;&quot;type&quot;:&quot;command&quot;,&quot;ns&quot;:&quot;wuid.tmp_repeat_unionId&quot;,&quot;command&quot;:&#123;&quot;insert&quot;:&quot;tmp_repeat_unionId&quot;,&quot;ordered&quot;:false,&quot;bypassDocumentValidation&quot;:true,&quot;$db&quot;:&quot;wuid&quot;&#125;,&quot;ninserted&quot;:128,&quot;keysInserted&quot;:128,&quot;numYields&quot;:0,&quot;reslen&quot;:245,&quot;locks&quot;:&#123;&quot;ParallelBatchWriterMode&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;r&quot;:1&#125;&#125;,&quot;FeatureCompatibilityVersion&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;w&quot;:1&#125;&#125;,&quot;ReplicationStateTransition&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;w&quot;:1&#125;&#125;,&quot;Global&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;w&quot;:1&#125;&#125;,&quot;Database&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;w&quot;:1&#125;&#125;,&quot;Collection&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;w&quot;:1&#125;&#125;,&quot;Mutex&quot;:&#123;&quot;acquireCount&quot;:&#123;&quot;r&quot;:1&#125;&#125;&#125;,&quot;flowControl&quot;:&#123;&quot;acquireCount&quot;:1,&quot;acquireWaitCount&quot;:1,&quot;timeAcquiringMicros&quot;:1008708&#125;,&quot;storage&quot;:&#123;&#125;,&quot;protocol&quot;:&quot;op_query&quot;,&quot;durationMillis&quot;:1011&#125;&#125;</span><br><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:09:47.760+08:00&quot;&#125;,&quot;s&quot;:&quot;W&quot;, &quot;c&quot;:&quot;COMMAND&quot;, &quot;id&quot;:20525, &quot;ctx&quot;:&quot;conn4538447&quot;,&quot;msg&quot;:&quot;Failed to gather storage statistics for slow operation&quot;,&quot;attr&quot;:&#123;&quot;opId&quot;:1071745126,&quot;error&quot;:&quot;lock acquire timeout&quot;&#125;&#125;</span><br><span class="line">/Kill</span><br><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:48:00.573+08:00&quot;&#125;,&quot;s&quot;:&quot;I&quot;, &quot;c&quot;:&quot;SHARDING&quot;, &quot;id&quot;:4784902, &quot;ctx&quot;:&quot;SignalHandler&quot;,&quot;msg&quot;:&quot;Shutting down the WaitForMajorityService&quot;&#125;</span><br><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:48:00.573+08:00&quot;&#125;,&quot;s&quot;:&quot;I&quot;, &quot;c&quot;:&quot;NETWORK&quot;, &quot;id&quot;:20562, &quot;ctx&quot;:&quot;SignalHandler&quot;,&quot;msg&quot;:&quot;Shutdown: going to close listening sockets&quot;&#125;</span><br><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:48:00.573+08:00&quot;&#125;,&quot;s&quot;:&quot;I&quot;, &quot;c&quot;:&quot;NETWORK&quot;, &quot;id&quot;:4784905, &quot;ctx&quot;:&quot;SignalHandler&quot;,&quot;msg&quot;:&quot;Shutting down the global connection pool&quot;&#125;</span><br><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:48:00.573+08:00&quot;&#125;,&quot;s&quot;:&quot;I&quot;, &quot;c&quot;:&quot;STORAGE&quot;, &quot;id&quot;:4784906, &quot;ctx&quot;:&quot;SignalHandler&quot;,&quot;msg&quot;:&quot;Shutting down the FlowControlTicketholder&quot;&#125;</span><br><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:48:00.573+08:00&quot;&#125;,&quot;s&quot;:&quot;I&quot;, &quot;c&quot;:&quot;-&quot;, &quot;id&quot;:20520, &quot;ctx&quot;:&quot;SignalHandler&quot;,&quot;msg&quot;:&quot;Stopping further Flow Control ticket acquisitions.&quot;&#125;</span><br><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:48:00.573+08:00&quot;&#125;,&quot;s&quot;:&quot;I&quot;, &quot;c&quot;:&quot;REPL&quot;, &quot;id&quot;:4784907, &quot;ctx&quot;:&quot;SignalHandler&quot;,&quot;msg&quot;:&quot;Shutting down the replica set node executor&quot;&#125;</span><br><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:48:00.573+08:00&quot;&#125;,&quot;s&quot;:&quot;I&quot;, &quot;c&quot;:&quot;NETWORK&quot;, &quot;id&quot;:4784918, &quot;ctx&quot;:&quot;SignalHandler&quot;,&quot;msg&quot;:&quot;Shutting down the ReplicaSetMonitor&quot;&#125;</span><br><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:48:00.573+08:00&quot;&#125;,&quot;s&quot;:&quot;I&quot;, &quot;c&quot;:&quot;SHARDING&quot;, &quot;id&quot;:4784921, &quot;ctx&quot;:&quot;SignalHandler&quot;,&quot;msg&quot;:&quot;Shutting down the MigrationUtilExecutor&quot;&#125;</span><br><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:48:00.573+08:00&quot;&#125;,&quot;s&quot;:&quot;I&quot;, &quot;c&quot;:&quot;CONTROL&quot;, &quot;id&quot;:4784925, &quot;ctx&quot;:&quot;SignalHandler&quot;,&quot;msg&quot;:&quot;Shutting down free monitoring&quot;&#125;</span><br><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:48:00.573+08:00&quot;&#125;,&quot;s&quot;:&quot;I&quot;, &quot;c&quot;:&quot;STORAGE&quot;, &quot;id&quot;:4784927, &quot;ctx&quot;:&quot;SignalHandler&quot;,&quot;msg&quot;:&quot;Shutting down the HealthLog&quot;&#125;</span><br><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:48:00.573+08:00&quot;&#125;,&quot;s&quot;:&quot;I&quot;, &quot;c&quot;:&quot;STORAGE&quot;, &quot;id&quot;:4784929, &quot;ctx&quot;:&quot;SignalHandler&quot;,&quot;msg&quot;:&quot;Acquiring the global lock for shutdown&quot;&#125;</span><br><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:48:00.573+08:00&quot;&#125;,&quot;s&quot;:&quot;I&quot;, &quot;c&quot;:&quot;-&quot;, &quot;id&quot;:4784931, &quot;ctx&quot;:&quot;SignalHandler&quot;,&quot;msg&quot;:&quot;Dropping the scope cache for shutdown&quot;&#125;</span><br><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:48:00.573+08:00&quot;&#125;,&quot;s&quot;:&quot;I&quot;, &quot;c&quot;:&quot;FTDC&quot;, &quot;id&quot;:4784926, &quot;ctx&quot;:&quot;SignalHandler&quot;,&quot;msg&quot;:&quot;Shutting down full-time data capture&quot;&#125;</span><br><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:48:00.573+08:00&quot;&#125;,&quot;s&quot;:&quot;I&quot;, &quot;c&quot;:&quot;CONTROL&quot;, &quot;id&quot;:20565, &quot;ctx&quot;:&quot;SignalHandler&quot;,&quot;msg&quot;:&quot;Now exiting&quot;&#125;</span><br><span class="line">&#123;&quot;t&quot;:&#123;&quot;$date&quot;:&quot;2023-04-11T17:48:00.573+08:00&quot;&#125;,&quot;s&quot;:&quot;I&quot;, &quot;c&quot;:&quot;CONTROL&quot;, &quot;id&quot;:23138, &quot;ctx&quot;:&quot;SignalHandler&quot;,&quot;msg&quot;:&quot;Shutting down&quot;,&quot;attr&quot;:&#123;&quot;exitCode&quot;:0&#125;&#125;</span><br></pre></td></tr></table></figure><br>这是由于 /usr/lib/systemd/system/mongod.service 中采用了 Type=forking<br><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">[Service]</span><br><span class="line">User=mongod</span><br><span class="line">Group=mongod</span><br><span class="line">Environment=&quot;OPTIONS=-f /etc/mongod.conf&quot;</span><br><span class="line">EnvironmentFile=-/etc/sysconfig/mongod</span><br><span class="line">ExecStart=/usr/bin/mongod $OPTIONS</span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">ExecStartPre=/usr/bin/mkdir -p /app/mongodb</span></span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">ExecStartPre=/usr/bin/chown -R mongod:mongod /app/mongodb</span></span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">ExecStartPre=/usr/bin/chmod -R 0755 /app/mongodb</span></span><br><span class="line">PermissionsStartOnly=true</span><br><span class="line">PIDFile=/app/mongodb/data/mongod.pid</span><br><span class="line">Type=forking</span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">file size</span></span><br><span class="line">LimitFSIZE=infinity</span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">cpu time</span></span><br><span class="line">...</span><br></pre></td></tr></table></figure><br>在等待forking 子进程超时时杀掉了主进程。而因为实例启动时需要大量回滚恢复操作。这里将Type=forking 注释掉，然后重启。就正常了<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">#Type=forking</span><br></pre></td></tr></table></figure></p>
+<p>从库不能读，在主库中设置<br><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Mmp_wuid:PRIMARY&gt; db.getMongo().setSecondaryOk()</span><br></pre></td></tr></table></figure></p>
+<p>查看集群状态<br><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Mmp_wuid:PRIMARY&gt; rs.status()</span><br></pre></td></tr></table></figure></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/replica-set/" rel="tag"># replica set</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/04/06/ShellDateAdd/" rel="prev" title="Shell的日期加减操作">
+      <i class="fa fa-chevron-left"></i> Shell的日期加减操作
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/04/27/kickstart/" rel="next" title="kickstart配置项说明">
+      kickstart配置项说明 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%90%AF%E5%8A%A8mongodb"><span class="nav-number">1.</span> <span class="nav-text">启动mongodb</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%81%9C%E7%94%A8mongodb"><span class="nav-number">2.</span> <span class="nav-text">停用mongodb</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%9F%A5%E7%9C%8B%E5%90%AF%E5%8A%A8%E7%BB%93%E6%9E%9C"><span class="nav-number">3.</span> <span class="nav-text">查看启动结果</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Sheen</p>
+  <div class="site-description" itemprop="description">数据库相关技术研究,自动化运维</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">42</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">53</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Sheen</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/pjax/pjax.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[data-pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.dataset.pjax !== undefined) {
+      script.dataset.pjax = '';
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '78f8e6427a00d33b1454',
+      clientSecret: 'df55248398c379200efd40824ecae2d9fd208e20',
+      repo        : 'sheenzxx.github.io',
+      owner       : 'sheenzxx',
+      admin       : ['sheenzxx'],
+      id          : 'efd079b691e74cce2e44cb114ea0b46a',
+        language: 'zh-CN',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+    </div>
+</body>
+</html>

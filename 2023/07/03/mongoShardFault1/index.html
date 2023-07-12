@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"sheenzxx.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"gitalk","storage":true,"lazyload":false,"nav":null,"activeClass":"gitalk"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="由于以前开发在使用时并没有注意到sharding 分片的使用。导致表并未做分片。所有数据都压在主节点上。造成集群中一个分片空间使用率接近90%,而另一个分片使用率0%。需要对整个库所有的表都开启分片处理。今天对其中一个表进行分片键索引的添加。同时开发那边递交几个索引。说是应用上使用不到的，可以删掉，腾出些空间。于是开始操作，先建索引。然后再删掉无用索引。 建hash 索引(50分钟后。索引建立完成">
+<meta property="og:type" content="article">
+<meta property="og:title" content="mongodb 4.2 sharding 建删索引引发的一次故障">
+<meta property="og:url" content="https://sheenzxx.github.io/2023/07/03/mongoShardFault1/index.html">
+<meta property="og:site_name" content="sheen&#39;s Blog">
+<meta property="og:description" content="由于以前开发在使用时并没有注意到sharding 分片的使用。导致表并未做分片。所有数据都压在主节点上。造成集群中一个分片空间使用率接近90%,而另一个分片使用率0%。需要对整个库所有的表都开启分片处理。今天对其中一个表进行分片键索引的添加。同时开发那边递交几个索引。说是应用上使用不到的，可以删掉，腾出些空间。于是开始操作，先建索引。然后再删掉无用索引。 建hash 索引(50分钟后。索引建立完成">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://sheenzxx.github.io/2023/07/03/mongoShardFault1/images/pcpu.png">
+<meta property="og:image" content="https://sheenzxx.github.io/2023/07/03/mongoShardFault1/images/pOp.png">
+<meta property="og:image" content="https://sheenzxx.github.io/2023/07/03/mongoShardFault1/images/pwr.png">
+<meta property="og:image" content="https://sheenzxx.github.io/2023/07/03/mongoShardFault1/images/sOp.png">
+<meta property="og:image" content="https://sheenzxx.github.io/2023/07/03/mongoShardFault1/images/swr.png">
+<meta property="article:published_time" content="2023-07-03T07:57:31.000Z">
+<meta property="article:modified_time" content="2023-07-03T10:12:43.775Z">
+<meta property="article:author" content="Sheen">
+<meta property="article:tag" content="sharding">
+<meta property="article:tag" content="replica">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://sheenzxx.github.io/2023/07/03/mongoShardFault1/images/pcpu.png">
+
+<link rel="canonical" href="https://sheenzxx.github.io/2023/07/03/mongoShardFault1/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>mongodb 4.2 sharding 建删索引引发的一次故障 | sheen's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="sheen's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">sheen's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">随笔，技术笔记</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/home/" rel="section"><i class="home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://sheenzxx.github.io/2023/07/03/mongoShardFault1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Sheen">
+      <meta itemprop="description" content="数据库相关技术研究,自动化运维">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="sheen's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          mongodb 4.2 sharding 建删索引引发的一次故障
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2023-07-03 15:57:31 / 修改时间：18:12:43" itemprop="dateCreated datePublished" datetime="2023-07-03T15:57:31+08:00">2023-07-03</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/mongodb/" itemprop="url" rel="index"><span itemprop="name">mongodb</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>由于以前开发在使用时并没有注意到sharding 分片的使用。导致表并未做分片。所有数据都压在主节点上。造成集群中一个分片<br>空间使用率接近90%,而另一个分片使用率0%。需要对整个库所有的表都开启分片处理。今天对其中一个表进行分片键索引的添加。<br>同时开发那边递交几个索引。说是应用上使用不到的，可以删掉，腾出些空间。于是开始操作，先建索引。然后再删掉无用索引。</p>
+<p>建hash 索引(50分钟后。索引建立完成)<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">db.wuid_xxxx_record.createIndex(&#123;&quot;wuid&quot;:&quot;hashed&quot;&#125;)</span><br></pre></td></tr></table></figure></p>
+<p>删除索引(索引建完后，开始执行清除无用索引)<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">db.wuid.dropIndex(&quot;platform_type_1&quot;) </span><br><span class="line">db.wuid_xxxx_record.dropIndex(&quot;platform_type_1&quot;)</span><br><span class="line">db.wuid_xxxx_request.dropIndex(&quot;platform_type_1&quot;)</span><br><span class="line">db.wuid_xxx.dropIndex(&quot;platform_type_1&quot;)</span><br></pre></td></tr></table></figure><br>过了一分钟后。也就是在11:47分,突然应用接口开始报超时。数据监控的读写队列开始飙升。数据库响应非常慢。查看shard分片监控:</p>
+<h4 id="主库cpu使用率"><a href="#主库cpu使用率" class="headerlink" title="主库cpu使用率"></a>主库cpu使用率</h4><p><img src="images/pcpu.png" alt="pcpu"></p>
+<h4 id="主库OpCounter"><a href="#主库OpCounter" class="headerlink" title="主库OpCounter"></a>主库OpCounter</h4><p><img src="images/pOp.png" alt="pOp"></p>
+<h4 id="主库读写队列"><a href="#主库读写队列" class="headerlink" title="主库读写队列"></a>主库读写队列</h4><p><img src="images/pwr.png" alt="pwr"><br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ob.currentOp()  ##查出来有2000个连接</span><br></pre></td></tr></table></figure><br>丈二和尚摸不着头脑 T.T。执行索引清除不会锁表。不应该会导致大量语句堵塞。于是赶紧开单问了阿里童靴。<br>经过阿里童靴一番查看之后。说是从库写多CPU打满,从库复制落后主库10秒后引发主库限流。</p>
+<h4 id="从库影响主库？"><a href="#从库影响主库？" class="headerlink" title="从库影响主库？"></a>从库影响主库？</h4><p>查看分片从库节点监控</p>
+<h4 id="从库cpu使用率以及Opcounter"><a href="#从库cpu使用率以及Opcounter" class="headerlink" title="从库cpu使用率以及Opcounter"></a>从库cpu使用率以及Opcounter</h4><p><img src="images/sOp.png" alt="sOp"></p>
+<h4 id="从库读写队列"><a href="#从库读写队列" class="headerlink" title="从库读写队列"></a>从库读写队列</h4><p><img src="images/swr.png" alt="swr"></p>
+<p>从库写多。但是当时主库的currentOp 并没有特别的增加。而且主库都没事。为啥从库会在那个点突然就飚到100%使用率？<br>请阿里的同学再细查下从库当时从库的操作。后面给出的结论是。主库上执行创建索引的操作在从库回放，开始build index,<br>执行一段时间之后。刚好又接收到主库发来的drop Index 。这时 wuid_xxxx_record 同时执行 create index 和 drop index<br>导致从库的CPU 飙高到100%。 从库响应慢了，导致触发架构中的分片主从节点数据同步保护机制(默认从库落后主库10s)。<br>引发了对主库操作的限流，从而导致到主库的请求全部被堵塞在队列中。导致应用的请求全部超时。</p>
+<h3 id="注意"><a href="#注意" class="headerlink" title="注意"></a>注意</h3><p>以后的操作要同时注意shard 分片的状态。同时有删索引建索引操作的。最好先执行删索引再执行建索引。这样避免有相同表出现<br>上述情况。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/sharding/" rel="tag"># sharding</a>
+              <a href="/tags/replica/" rel="tag"># replica</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/06/16/sqlt/" rel="prev" title="oracle 19c 安装 sqlt">
+      <i class="fa fa-chevron-left"></i> oracle 19c 安装 sqlt
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/07/12/dokerPerconaUpgrade/" rel="next" title="对 docker Percona mysql 进行版本替换升级">
+      对 docker Percona mysql 进行版本替换升级 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%BB%E5%BA%93cpu%E4%BD%BF%E7%94%A8%E7%8E%87"><span class="nav-number">1.</span> <span class="nav-text">主库cpu使用率</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%BB%E5%BA%93OpCounter"><span class="nav-number">2.</span> <span class="nav-text">主库OpCounter</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%BB%E5%BA%93%E8%AF%BB%E5%86%99%E9%98%9F%E5%88%97"><span class="nav-number">3.</span> <span class="nav-text">主库读写队列</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%BB%8E%E5%BA%93%E5%BD%B1%E5%93%8D%E4%B8%BB%E5%BA%93%EF%BC%9F"><span class="nav-number">4.</span> <span class="nav-text">从库影响主库？</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%BB%8E%E5%BA%93cpu%E4%BD%BF%E7%94%A8%E7%8E%87%E4%BB%A5%E5%8F%8AOpcounter"><span class="nav-number">5.</span> <span class="nav-text">从库cpu使用率以及Opcounter</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%BB%8E%E5%BA%93%E8%AF%BB%E5%86%99%E9%98%9F%E5%88%97"><span class="nav-number">6.</span> <span class="nav-text">从库读写队列</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B3%A8%E6%84%8F"><span class="nav-number"></span> <span class="nav-text">注意</span></a></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Sheen</p>
+  <div class="site-description" itemprop="description">数据库相关技术研究,自动化运维</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">42</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">53</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Sheen</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/pjax/pjax.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[data-pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.dataset.pjax !== undefined) {
+      script.dataset.pjax = '';
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '78f8e6427a00d33b1454',
+      clientSecret: 'df55248398c379200efd40824ecae2d9fd208e20',
+      repo        : 'sheenzxx.github.io',
+      owner       : 'sheenzxx',
+      admin       : ['sheenzxx'],
+      id          : 'fad295f68ba786f934562309e0c4ed39',
+        language: 'zh-CN',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+    </div>
+</body>
+</html>
