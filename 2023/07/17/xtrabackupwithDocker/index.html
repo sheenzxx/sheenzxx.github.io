@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"sheenzxx.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"gitalk","storage":true,"lazyload":false,"nav":null,"activeClass":"gitalk"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="1.拉取 xtrbackup Docker 镜像镜像版本可以在 https:&#x2F;&#x2F;hub.docker.com&#x2F;r&#x2F;percona&#x2F;percona-xtrabackup&#x2F;tags 查找1docker pull percona&#x2F;percona-xtrabackup:8.0.33-27  2.写一个可以支持全备和增量备份的脚本。12345678910111213141516171819202122232">
+<meta property="og:type" content="article">
+<meta property="og:title" content="用xtrabackup 备份恢复Docker 的实例">
+<meta property="og:url" content="https://sheenzxx.github.io/2023/07/17/xtrabackupwithDocker/index.html">
+<meta property="og:site_name" content="sheen&#39;s Blog">
+<meta property="og:description" content="1.拉取 xtrbackup Docker 镜像镜像版本可以在 https:&#x2F;&#x2F;hub.docker.com&#x2F;r&#x2F;percona&#x2F;percona-xtrabackup&#x2F;tags 查找1docker pull percona&#x2F;percona-xtrabackup:8.0.33-27  2.写一个可以支持全备和增量备份的脚本。12345678910111213141516171819202122232">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2023-07-17T06:28:36.000Z">
+<meta property="article:modified_time" content="2023-07-19T01:59:39.371Z">
+<meta property="article:author" content="Sheen">
+<meta property="article:tag" content="docker">
+<meta property="article:tag" content="percona">
+<meta property="article:tag" content="xtrabackup">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://sheenzxx.github.io/2023/07/17/xtrabackupwithDocker/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>用xtrabackup 备份恢复Docker 的实例 | sheen's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="sheen's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">sheen's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">随笔，技术笔记</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/home/" rel="section"><i class="home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://sheenzxx.github.io/2023/07/17/xtrabackupwithDocker/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Sheen">
+      <meta itemprop="description" content="数据库相关技术研究,自动化运维">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="sheen's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          用xtrabackup 备份恢复Docker 的实例
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2023-07-17 14:28:36" itemprop="dateCreated datePublished" datetime="2023-07-17T14:28:36+08:00">2023-07-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2023-07-19 09:59:39" itemprop="dateModified" datetime="2023-07-19T09:59:39+08:00">2023-07-19</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/mysql/" itemprop="url" rel="index"><span itemprop="name">mysql</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>1.拉取 xtrbackup Docker 镜像<br>镜像版本可以在 <a target="_blank" rel="noopener" href="https://hub.docker.com/r/percona/percona-xtrabackup/tags">https://hub.docker.com/r/percona/percona-xtrabackup/tags</a> 查找<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker pull percona/percona-xtrabackup:8.0.33-27 </span><br></pre></td></tr></table></figure></p>
+<p>2.写一个可以支持全备和增量备份的脚本。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cat</span> xtrabackupDocker.sh </span><br><span class="line"><span class="comment">#!/bin/sh</span></span><br><span class="line"><span class="comment"># 注意所有要docker挂载的路径都要有777 权限。否则都会报权限错误</span></span><br><span class="line"><span class="comment"># 全备和增备都以日期目录存储</span></span><br><span class="line"><span class="comment"># 增量备份 为取全备目录里面最新的一个全备为基础备份。没有基础备份退出增量备份</span></span><br><span class="line"></span><br><span class="line">fullTag=<span class="variable">$1</span></span><br><span class="line">BACKUP_PATH=/data/percona_data/backup</span><br><span class="line"></span><br><span class="line">today=`<span class="built_in">date</span> +<span class="string">&#x27;%Y%m%d_%H%M&#x27;</span>`</span><br><span class="line"></span><br><span class="line"><span class="comment">##创建备份路径</span></span><br><span class="line"><span class="keyword">function</span> <span class="function"><span class="title">build_path</span></span>()&#123;</span><br><span class="line">   <span class="keyword">if</span> [ ! -d <span class="variable">$&#123;BACKUP_PATH&#125;</span>/full ];<span class="keyword">then</span></span><br><span class="line">      <span class="built_in">mkdir</span> -p <span class="variable">$&#123;BACKUP_PATH&#125;</span>/full</span><br><span class="line">      <span class="built_in">chmod</span> 777 <span class="variable">$&#123;BACKUP_PATH&#125;</span>/full</span><br><span class="line">   <span class="keyword">fi</span></span><br><span class="line">   <span class="keyword">if</span> [ ! -d <span class="variable">$&#123;BACKUP_PATH&#125;</span>/inc ];<span class="keyword">then</span></span><br><span class="line">      <span class="built_in">mkdir</span> -p <span class="variable">$&#123;BACKUP_PATH&#125;</span>/inc</span><br><span class="line">      <span class="built_in">chmod</span> 777 <span class="variable">$&#123;BACKUP_PATH&#125;</span>/inc</span><br><span class="line">   <span class="keyword">fi</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">## 全备函数</span></span><br><span class="line"><span class="keyword">function</span> <span class="function"><span class="title">full_backup</span></span>()&#123;</span><br><span class="line">   <span class="built_in">cd</span> <span class="variable">$&#123;BACKUP_PATH&#125;</span>/full</span><br><span class="line">   <span class="keyword">if</span> [ -d <span class="variable">$&#123;BACKUP_PATH&#125;</span>/full/<span class="variable">$today</span> ];<span class="keyword">then</span></span><br><span class="line">      <span class="built_in">rm</span> -rf <span class="variable">$&#123;BACKUP_PATH&#125;</span>/full/<span class="variable">$today</span></span><br><span class="line">   <span class="keyword">fi</span></span><br><span class="line">   <span class="built_in">mkdir</span> <span class="variable">$today</span></span><br><span class="line">   <span class="built_in">chmod</span> 777 <span class="variable">$today</span></span><br><span class="line">   </span><br><span class="line">   docker run --name percona-xtrabackup \</span><br><span class="line">     --volumes-from percona-server8033 \    </span><br><span class="line">     -v <span class="variable">$&#123;BACKUP_PATH&#125;</span>/full/<span class="variable">$today</span>:/backup \</span><br><span class="line">     percona/percona-xtrabackup:8.0.33-27  \</span><br><span class="line">     xtrabackup --backup --datadir=/var/lib/mysql/ --target-dir=/backup \</span><br><span class="line">     --user=root --password=123456</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">## 增量备份</span></span><br><span class="line"><span class="keyword">function</span> <span class="function"><span class="title">inc_backup</span></span>()&#123;</span><br><span class="line">  <span class="built_in">cd</span> <span class="variable">$&#123;BACKUP_PATH&#125;</span>/inc</span><br><span class="line">  <span class="keyword">if</span> [ -d <span class="variable">$&#123;BACKUP_PATH&#125;</span>/inc/<span class="variable">$today</span> ];<span class="keyword">then</span></span><br><span class="line">      <span class="built_in">rm</span> -rf <span class="variable">$&#123;BACKUP_PATH&#125;</span>/inc/<span class="variable">$today</span></span><br><span class="line">  <span class="keyword">fi</span></span><br><span class="line">  <span class="built_in">mkdir</span> <span class="variable">$today</span></span><br><span class="line">  <span class="built_in">chmod</span> 777 <span class="variable">$today</span></span><br><span class="line">  <span class="built_in">cd</span> <span class="variable">$&#123;BACKUP_PATH&#125;</span>/full</span><br><span class="line">  last_full=<span class="variable">$BACKUP_PATH</span>/full/$(<span class="built_in">ls</span> -t | <span class="built_in">head</span> -1)</span><br><span class="line">  <span class="keyword">if</span> [ <span class="string">&quot;<span class="variable">$last_full</span>&quot;</span> = <span class="string">&quot;<span class="variable">$BACKUP_PATH</span>/full/&quot;</span> ];<span class="keyword">then</span></span><br><span class="line">     <span class="built_in">exit</span></span><br><span class="line">  <span class="keyword">fi</span></span><br><span class="line">  <span class="built_in">cd</span> <span class="variable">$&#123;BACKUP_PATH&#125;</span>/inc</span><br><span class="line">  docker run --name percona-xtrabackup \</span><br><span class="line">     --volumes-from percona-server8033 \</span><br><span class="line">     -v <span class="variable">$last_full</span>:/backup \</span><br><span class="line">     -v <span class="variable">$&#123;BACKUP_PATH&#125;</span>/inc/<span class="variable">$today</span>:/inc \</span><br><span class="line">     percona/percona-xtrabackup:8.0.33-27  \</span><br><span class="line">     xtrabackup --backup --datadir=/var/lib/mysql/ --target-dir=/inc \</span><br><span class="line">     --incremental-basedir=/backup \</span><br><span class="line">     --user=root --password=123456</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">##创建路径</span></span><br><span class="line">build_path || <span class="built_in">return</span> 1</span><br><span class="line"></span><br><span class="line"><span class="comment">##清除docker 容器</span></span><br><span class="line">containerId=`docker ps -a |grep percona-xtrabackup|awk <span class="string">&#x27;&#123;print $1&#125;&#x27;</span>`</span><br><span class="line">docker <span class="built_in">rm</span> <span class="variable">$containerId</span></span><br><span class="line"><span class="comment">##</span></span><br><span class="line"><span class="keyword">if</span> [ <span class="string">&quot;<span class="variable">$fullTag</span>&quot;</span> = <span class="string">&quot;full&quot;</span> ];<span class="keyword">then</span></span><br><span class="line">   full_backup</span><br><span class="line"><span class="keyword">else</span></span><br><span class="line">   inc_backup</span><br><span class="line"><span class="keyword">fi</span></span><br></pre></td></tr></table></figure></p>
+<p>3.发起备份<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">chmod</span> +x xtrabackupDocker.sh</span><br><span class="line">./xtrabackupDocker.sh full <span class="comment">## 为发起全备</span></span><br><span class="line">./xtrabackupDocker.sh <span class="comment">## 不加参数为增备</span></span><br></pre></td></tr></table></figure></p>
+<p>4.恢复备份<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cd</span>  /data/percona_data/backup/full</span><br><span class="line"><span class="built_in">ls</span></span><br><span class="line">20230714_1528</span><br><span class="line"></span><br><span class="line"><span class="comment">## 创建恢复容器</span></span><br><span class="line">docker create --name percona-xtrabackup_recovery --volumes-from percona-server8033 \</span><br><span class="line">-v /data/percona_data/backup/full/20230714_1528:/backup \</span><br><span class="line">-v /data/percona_data/conf/my.cnf:/etc/mysql/conf.d/my.cnf \</span><br><span class="line">percona/percona-xtrabackup:8.0.33-27  \</span><br><span class="line">xtrabackup --defaults-file=/etc/mysql/conf.d/my.cnf  --prepare --target-dir=/backup \</span><br><span class="line">--user=root --password=123456</span><br><span class="line"></span><br><span class="line"><span class="comment">## 执行恢复命令</span></span><br><span class="line">docker start -ai percona-xtrabackup  <span class="comment"># 第一遍执行</span></span><br><span class="line">docker start -ai percona-xtrabackup  <span class="comment"># 第二遍执行</span></span><br><span class="line"></span><br><span class="line"><span class="comment">## 将目录拷回原来的数据目录</span></span><br><span class="line">docker stop percona-server8033</span><br><span class="line"><span class="built_in">cd</span> /data/percona_data/</span><br><span class="line"><span class="built_in">mv</span> data8033 data8033_bak</span><br><span class="line"><span class="built_in">mv</span> /data/percona_data/backup/full/20230714_1528 data8033</span><br><span class="line">docker start percona-server8033</span><br></pre></td></tr></table></figure></p>
+<p>5.增量备份的恢复<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">## 先全量恢复。需要带  --apply-log-only 只应用日志</span></span><br><span class="line">docker run --name percona-xtrabackup_recovery --volumes-from percona-server8033 \</span><br><span class="line">-v /data/percona_data/backup/full/20230714_1528:/backup \</span><br><span class="line">-v /data/percona_data/conf/my.cnf:/etc/mysql/conf.d/my.cnf \</span><br><span class="line">percona/percona-xtrabackup:8.0.33-27  \</span><br><span class="line">xtrabackup --defaults-file=/etc/mysql/conf.d/my.cnf  --prepare --apply-log-only --target-dir=/backup \</span><br><span class="line">--user=root --password=123456</span><br><span class="line"></span><br><span class="line"><span class="comment">## 跑完就删 container .或者指定不同名字的container </span></span><br><span class="line"></span><br><span class="line">docker ps -a |grep percona-xtrabackup_recovery </span><br><span class="line">docker <span class="built_in">rm</span> <span class="variable">$container_id</span></span><br><span class="line"></span><br><span class="line"><span class="comment">## 恢复增量 本文实例为基于全量的增量。所以恢复时只需要指定最后一个增量 </span></span><br><span class="line"><span class="comment">## 如果是多级增量备份 只要不是最后一个增量，就需要加上 --apply-log-only 选项。最后一个增量恢复去除该选项即可</span></span><br><span class="line">docker run --name percona-xtrabackup_recovery --volumes-from percona-server8033 \</span><br><span class="line">-v /data/percona_data/backup/inc/20230715_1528:/inc \</span><br><span class="line">-v /data/percona_data/conf/my.cnf:/etc/mysql/conf.d/my.cnf \</span><br><span class="line">percona/percona-xtrabackup:8.0.33-27  \</span><br><span class="line">xtrabackup --defaults-file=/etc/mysql/conf.d/my.cnf  --prepare --target-dir=/backup \</span><br><span class="line">--user=root --password=123456</span><br><span class="line"></span><br></pre></td></tr></table></figure></p>
+<p>6.利用备份恢复为从库<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">## 先建一个从库的container </span></span><br><span class="line"><span class="comment">## 从库配置文件myslave.cnf 配置好从库相关选项。server-id 不能跟主库一样</span></span><br><span class="line">docker run -d \</span><br><span class="line">--name=percona-server8033_slave \</span><br><span class="line">-v /etc/localtime:/etc/localtime:ro \</span><br><span class="line">-v /etc/timezone:/etc/timezone  \</span><br><span class="line">-v /data/percona_data/data8033_slave:/var/lib/mysql \</span><br><span class="line">-v /data/percona_data/conf/myslave.cnf:/etc/my.cnf \</span><br><span class="line">-p 3307:3306 \</span><br><span class="line">-e MYSQL_ROOT_PASSWORD=123456 \</span><br><span class="line">percona/percona-server:8.0.33-25  \</span><br><span class="line">--character-set-server=utf8mb4 \</span><br><span class="line">--collation-server=utf8mb4_unicode_ci</span><br><span class="line"></span><br><span class="line">[root@localhost backup]<span class="comment"># docker ps -a</span></span><br><span class="line">CONTAINER ID   IMAGE                                  COMMAND                  CREATED      STATUS                  PORTS                                                  NAMES</span><br><span class="line">9a2016f84858   percona/percona-server:8.0.33-25       <span class="string">&quot;/docker-entrypoint.…&quot;</span>   2 days ago   Up 2 days               33060/tcp, 0.0.0.0:3307-&gt;3306/tcp, :::3307-&gt;3306/tcp   percona-server8033_slave</span><br><span class="line">docker logs 9a2016f84858 --follow</span><br><span class="line"></span><br><span class="line"><span class="comment">## 等初始化完成之后，停掉container</span></span><br><span class="line">docker stop percona-server8033_slave</span><br><span class="line"><span class="comment">## 恢复备份</span></span><br><span class="line">docker create --name percona-xtrabackup_recovery --volumes-from percona-server8033 \</span><br><span class="line">-v /data/percona_data/backup/full/20230714_1528:/backup \</span><br><span class="line">-v /data/percona_data/conf/my.cnf:/etc/mysql/conf.d/my.cnf \</span><br><span class="line">percona/percona-xtrabackup:8.0.33-27  \</span><br><span class="line">xtrabackup --defaults-file=/etc/mysql/conf.d/my.cnf  --prepare --target-dir=/backup \</span><br><span class="line">--user=root --password=123456</span><br><span class="line"></span><br><span class="line"><span class="comment">## 执行恢复命令</span></span><br><span class="line">docker start -ai percona-xtrabackup  <span class="comment"># 第一遍执行</span></span><br><span class="line">docker start -ai percona-xtrabackup  <span class="comment"># 第二遍执行</span></span><br><span class="line"></span><br><span class="line"><span class="comment">## 替换目录，将恢复的目录替为 /data/percona_data/data8033_slave 的目录</span></span><br><span class="line"><span class="built_in">mv</span> /data/percona_data/data8033_slave /data/percona_data/data8033_slave_bak</span><br><span class="line"><span class="built_in">mv</span> /data/percona_data/backup/full/20230714_1528 /data/percona_data/data8033_slave</span><br><span class="line"><span class="built_in">chmod</span> 777 /data/percona_data/data8033_slave</span><br><span class="line"></span><br><span class="line"><span class="comment">## 启动 从库容器</span></span><br><span class="line">docker start percona-server8033_slave</span><br><span class="line"></span><br><span class="line"><span class="comment">## 在主库创建复制账号</span></span><br><span class="line">docker <span class="built_in">exec</span> -it percona-server8033 mysql -uroot -p123456 -e <span class="string">&quot;create user repl@&#x27;%&#x27; identified by &#x27;repl&#x27;;grant select,replication slave on *.* to repl@&#x27;%&#x27;;&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment">## 获取备份时的gtid 信息</span></span><br><span class="line"><span class="built_in">cd</span>  data8033_slave</span><br><span class="line"></span><br><span class="line"><span class="built_in">cat</span> xtrabackup_info</span><br><span class="line">...</span><br><span class="line">binlog_pos = filename <span class="string">&#x27;binlog.000007&#x27;</span>, position <span class="string">&#x27;197&#x27;</span>, GTID of the last change <span class="string">&#x27;c1ef4787-206b-11ee-8d03-0242ac110002:1-77&#x27;</span></span><br><span class="line">...</span><br><span class="line"></span><br><span class="line"><span class="comment">## 设置从库gtid 信息</span></span><br><span class="line"></span><br><span class="line">docker <span class="built_in">exec</span> -it percona-server8033_slave mysql -uroot -p123456 -e <span class="string">&quot;reset slave;reset master; set gtid_purged=&#x27;c1ef4787-206b-11ee-8d03-0242ac110002:1-77&#x27;&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment">## 设置从库连接主库信息</span></span><br><span class="line">docker <span class="built_in">exec</span> -it percona-server8033_slave mysql -uroot -p123456 -e <span class="string">&quot;CHANGE REPLICATION SOURCE TO \</span></span><br><span class="line"><span class="string">&gt; SOURCE_HOST=&#x27;192.168.56.15&#x27;,\</span></span><br><span class="line"><span class="string">&gt; SOURCE_PORT=3306,\</span></span><br><span class="line"><span class="string">&gt; SOURCE_USER=&#x27;repl&#x27;,\</span></span><br><span class="line"><span class="string">&gt; SOURCE_PASSWORD=&#x27;repl&#x27;,\</span></span><br><span class="line"><span class="string">&gt; SOURCE_AUTO_POSITION=1;</span></span><br><span class="line"><span class="string">&quot;</span></span><br><span class="line">docker <span class="built_in">exec</span> -it percona-server8033_slave mysql -uroot -p123456 -e <span class="string">&quot;start slave;show slave status\G&quot;</span></span><br><span class="line"></span><br></pre></td></tr></table></figure></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/docker/" rel="tag"># docker</a>
+              <a href="/tags/percona/" rel="tag"># percona</a>
+              <a href="/tags/xtrabackup/" rel="tag"># xtrabackup</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/07/12/dokerPerconaUpgrade/" rel="prev" title="对 docker Percona mysql 进行版本替换升级">
+      <i class="fa fa-chevron-left"></i> 对 docker Percona mysql 进行版本替换升级
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/07/19/mongoDBUseShared/" rel="next" title="mongodb shard 集群开启分片">
+      mongodb shard 集群开启分片 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Sheen</p>
+  <div class="site-description" itemprop="description">数据库相关技术研究,自动化运维</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">44</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">54</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Sheen</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/pjax/pjax.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[data-pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.dataset.pjax !== undefined) {
+      script.dataset.pjax = '';
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '78f8e6427a00d33b1454',
+      clientSecret: 'df55248398c379200efd40824ecae2d9fd208e20',
+      repo        : 'sheenzxx.github.io',
+      owner       : 'sheenzxx',
+      admin       : ['sheenzxx'],
+      id          : '564d9d0a2a78730d038f2a6e82f94988',
+        language: 'zh-CN',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+    </div>
+</body>
+</html>
