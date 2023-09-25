@@ -28,7 +28,7 @@
 <meta property="og:description" content="背景公司升级了hive 由 1.2 升级到 3.1,这里涉及到元数据的搬迁过程。元数据信息存储在mysql中 升级过程 将旧库导出 1mysqldump -uxxxx -pxxxx-S &#x2F;tmp&#x2F;mysql.sock --routines  --triggers --set-gtid-purged&#x3D;off --default-character-set&#x3D;latin1 hadoop &gt;hado">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2023-03-14T04:28:38.000Z">
-<meta property="article:modified_time" content="2023-03-15T08:31:49.130Z">
+<meta property="article:modified_time" content="2023-08-28T07:35:42.705Z">
 <meta property="article:author" content="Sheen">
 <meta property="article:tag" content="hive">
 <meta name="twitter:card" content="summary">
@@ -222,7 +222,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2023-03-15 16:31:49" itemprop="dateModified" datetime="2023-03-15T16:31:49+08:00">2023-03-15</time>
+                <time title="修改时间：2023-08-28 15:35:42" itemprop="dateModified" datetime="2023-08-28T15:35:42+08:00">2023-08-28</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -257,8 +257,10 @@
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">#根据升级脚本，一个个版本叠加上来，就不会报错</span></span><br><span class="line">mysql -uxxx -pxxxx hadoop -S /tmp/mysql.hadoop.sock &lt; upgrade-1.2.0-to-2.0.0.mysql.sql</span><br><span class="line">mysql -uxxx -pxxxx hadoop -S /tmp/mysql.hadoop.sock &lt; upgrade-2.0.0-to-2.1.0.mysql.sql</span><br><span class="line">mysql -uxxx -pxxxx hadoop -S /tmp/mysql.hadoop.sock &lt; upgrade-2.1.0-to-2.2.0.mysql.sql</span><br><span class="line">mysql -uxxx -pxxxx hadoop -S /tmp/mysql.hadoop.sock &lt; upgrade-2.2.0-to-2.3.0.mysql.sql</span><br><span class="line">mysql -uxxx -pxxxx hadoop -S /tmp/mysql.hadoop.sock &lt; upgrade-2.3.0-to-3.0.0.mysql.sql</span><br><span class="line">mysql -uxxx -pxxxx hadoop -S /tmp/mysql.hadoop.sock &lt; upgrade-3.0.0-to-3.1.0.mysql.sql</span><br></pre></td></tr></table></figure>
 </li>
 <li><p>客户端报错</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">javax.jdo.JDOException: Exception thrown when executing query : SELECT <span class="string">&#x27;org.apache.hadoop.hive.metastore.model.MDatabase&#x27;</span> AS `NUCLEUS_TYPE`,`A0`.`DESC`,`A0`.`DB_LOCATION_URI`,`A0`.`NAME`,`A0`.`OWNER_NAME`,`A0`.`OWNER_TYPE`,`A0`.`D</span><br><span class="line">B_ID` FROM `DBS` `A0` WHERE `A0`.`NAME` = ?</span><br><span class="line"></span><br><span class="line">检查数据库发现DBS 有2个字段没有。在 hive-schema-3.1.0.mysql.sql 找到对应的 建表语句。将缺失字段添加回去</span><br><span class="line">ALTER TABLE `DBS` ADD `OWNER_NAME` varchar(128);</span><br><span class="line">ALTER TABLE `DBS` ADD `OWNER_TYPE` varchar(10);</span><br><span class="line">alter table DBS change `CTLG_NAME` `CTLG_NAME` varchar(256) NOT NULL DEFAULT <span class="string">&#x27;hive&#x27;</span> after OWNER_TYPE;</span><br><span class="line">问题解决</span><br></pre></td></tr></table></figure></li>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">javax.jdo.JDOException: Exception thrown when executing query : SELECT <span class="string">&#x27;org.apache.hadoop.hive.metastore.model.MDatabase&#x27;</span> AS `NUCLEUS_TYPE`,`A0`.`DESC`,`A0`.`DB_LOCATION_URI`,`A0`.`NAME`,`A0`.`OWNER_NAME`,`A0`.`OWNER_TYPE`,`A0`.`D</span><br><span class="line">B_ID` FROM `DBS` `A0` WHERE `A0`.`NAME` = ?</span><br><span class="line"></span><br><span class="line">检查数据库发现DBS 有2个字段没有。在 hive-schema-3.1.0.mysql.sql 找到对应的 建表语句。将缺失字段添加回去</span><br><span class="line">ALTER TABLE `DBS` ADD `OWNER_NAME` varchar(128);</span><br><span class="line">ALTER TABLE `DBS` ADD `OWNER_TYPE` varchar(10);</span><br><span class="line">alter table DBS change `CTLG_NAME` `CTLG_NAME` varchar(256) NOT NULL DEFAULT <span class="string">&#x27;hive&#x27;</span> after OWNER_TYPE;</span><br><span class="line">问题解决</span><br></pre></td></tr></table></figure>
+</li>
 </ol>
+<p>6.当新旧集群nameserver 不一样<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">UPDATE</span> dbs <span class="keyword">SET</span> DB_LOCATION_URI <span class="operator">=</span> REPLACE(db_location_uri,<span class="string">&#x27;$oldClustername&#x27;</span>,<span class="string">&#x27;$newClustername&#x27;</span>);</span><br><span class="line"><span class="keyword">UPDATE</span> sds <span class="keyword">SET</span> location <span class="operator">=</span> REPLACE(location,<span class="string">&#x27;$oldClustername&#x27;</span>,<span class="string">&#x27;$newClustername&#x27;</span>);</span><br></pre></td></tr></table></figure></p>
 
     </div>
 
@@ -357,7 +359,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">44</span>
+          <span class="site-state-item-count">51</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -370,7 +372,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">54</span>
+        <span class="site-state-item-count">61</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
