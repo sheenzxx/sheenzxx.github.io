@@ -189,6 +189,63 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://sheenzxx.github.io/2023/01/11/ckOptimize/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Sheen">
+      <meta itemprop="description" content="数据库相关技术研究,自动化运维">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="sheen's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2023/01/11/ckOptimize/" class="post-title-link" itemprop="url">ckOptimize</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2023-01-11 10:53:49" itemprop="dateCreated datePublished" datetime="2023-01-11T10:53:49+08:00">2023-01-11</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://sheenzxx.github.io/2023/01/04/clickhouseUser/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -967,80 +1024,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://sheenzxx.github.io/2022/11/01/oldestxmin/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="Sheen">
-      <meta itemprop="description" content="数据库相关技术研究,自动化运维">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="sheen's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/11/01/oldestxmin/" class="post-title-link" itemprop="url">日志报错:oldest xmin is far in the past</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2022-11-01 11:44:29 / 修改时间：12:03:17" itemprop="dateCreated datePublished" datetime="2022-11-01T11:44:29+08:00">2022-11-01</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/postgresql/" itemprop="url" rel="index"><span itemprop="name">postgresql</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>今天巡检RDS postgresql 上的日志，发现错误日志里面一直报错<br><img src="/images/16672725934495.png" alt="errorlog">   </p>
-<p>oldest xmin is far in the past<br>首先考虑到的是有长事务没有关闭导致autovacuum不能推进oldest xmin。<br>于是先查下有没idle in transaction 事务<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> <span class="operator">*</span> <span class="keyword">from</span> pg_stat_activity <span class="keyword">where</span> state<span class="operator">=</span><span class="string">&#x27;idle in transaction&#x27;</span></span><br></pre></td></tr></table></figure><br>发现并没有这样的transaction</p>
-<p>那么是有事务在准备阶段没有关闭吗<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> <span class="operator">*</span> <span class="keyword">from</span> pg_prepared_xacts;</span><br></pre></td></tr></table></figure><br>发现也没有结果</p>
-<p>出现这种情况的还有另一种可能。就是存在已经没有使用的复制槽</p>
-<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> <span class="operator">*</span> <span class="keyword">from</span> pg_replication_slots;</span><br></pre></td></tr></table></figure>
-<p>一看，果然有2条记录<br>经过一番询问，原来是好几个月前开发需要开DTS同步数据做数据集聚，但是项目已经停了好久。这边也没收到<br>通知。就这样落下了2个复制槽一直没有释放。由于长时间没用应用导致出现auto vacuum 的时候出错了</p>
-<p>既然已经找到问题。那就把这2个没用的复制槽删掉吧<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> pg_drop_replication_slot(<span class="string">&#x27;di_slot_2783&#x27;</span>);</span><br><span class="line"><span class="keyword">select</span> pg_drop_replication_slot(<span class="string">&#x27;di_slot_2785&#x27;</span>);</span><br></pre></td></tr></table></figure><br>过1分分钟重新查看日志。可以看到已经没报错vacumm 也执行过去了。oldest xmin: 662582680 达到6亿多<br><img src="/images/16672751408080.png" alt="resultpic"></p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1110,20 +1093,20 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">51</span>
+          <span class="site-state-item-count">52</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-count">11</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">62</span>
+        <span class="site-state-item-count">64</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
