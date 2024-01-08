@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"sheenzxx.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"gitalk","storage":true,"lazyload":false,"nav":null,"activeClass":"gitalk"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="组复制配置的相关要求 存储引擎必须是 innodb,所以禁用非innodb 存储引擎disabled_storage_engines&#x3D;”MyISAM,BLACKHOLE,FEDERATED,ARCHIVE,MEMORY”  主键组复制集群中所有的表必须具有主键，或者具有与主键等效的唯一键来确保能标识事务冲突时的行。组复制有自己的内部机制来检查。而不是使用 sql_require_primary_k">
+<meta property="og:type" content="article">
+<meta property="og:title" content="mysql8.2搭建单主模式组复制及相关知识">
+<meta property="og:url" content="https://sheenzxx.github.io/2023/12/22/mysql8grm/index.html">
+<meta property="og:site_name" content="sheen&#39;s Blog">
+<meta property="og:description" content="组复制配置的相关要求 存储引擎必须是 innodb,所以禁用非innodb 存储引擎disabled_storage_engines&#x3D;”MyISAM,BLACKHOLE,FEDERATED,ARCHIVE,MEMORY”  主键组复制集群中所有的表必须具有主键，或者具有与主键等效的唯一键来确保能标识事务冲突时的行。组复制有自己的内部机制来检查。而不是使用 sql_require_primary_k">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2023-12-22T03:31:56.000Z">
+<meta property="article:modified_time" content="2023-12-22T06:57:00.987Z">
+<meta property="article:author" content="Sheen">
+<meta property="article:tag" content="group replication">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://sheenzxx.github.io/2023/12/22/mysql8grm/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>mysql8.2搭建单主模式组复制及相关知识 | sheen's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="sheen's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">sheen's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">随笔，技术笔记</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/home/" rel="section"><i class="home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://sheenzxx.github.io/2023/12/22/mysql8grm/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Sheen">
+      <meta itemprop="description" content="数据库相关技术研究,自动化运维">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="sheen's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          mysql8.2搭建单主模式组复制及相关知识
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2023-12-22 11:31:56 / 修改时间：14:57:00" itemprop="dateCreated datePublished" datetime="2023-12-22T11:31:56+08:00">2023-12-22</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/mysql/" itemprop="url" rel="index"><span itemprop="name">mysql</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="组复制配置的相关要求"><a href="#组复制配置的相关要求" class="headerlink" title="组复制配置的相关要求"></a>组复制配置的相关要求</h2><ol>
+<li><p>存储引擎必须是 innodb,所以禁用非innodb 存储引擎<br>disabled_storage_engines=”MyISAM,BLACKHOLE,FEDERATED,ARCHIVE,MEMORY”</p>
+</li>
+<li><p>主键<br>组复制集群中所有的表必须具有主键，或者具有与主键等效的唯一键来确保能标识事务冲突时的行。组复制有自己的内部机制来检查。而不是使用 sql_require_primary_key 参数强制使用主键，<br>你可以在组复制运行时设置 sql_require_primary_key =on 或者在 CHANGE REPLICATION SOURCE TO 时指定 REQUIRE_TABLE_PRIMARY_KEY_CHECK=ON.<br>来限制建表时必须使用主键。但是你可能会发现，某些组复制内部机制允许的行为在 sql_require_primary_key =on 或者在 CHANGE REPLICATION SOURCE TO 时指定 REQUIRE_TABLE_PRIMARY_KEY_CHECK=ON<br>时是不允许的</p>
+</li>
+<li><p>网络性能<br>部署在稳定的同个局域网内。关闭防火墙等可能会影响节点间检测的服务</p>
+</li>
+<li><p>唯一的服务标准。 每个实例有自己独立的 server_id</p>
+</li>
+<li><p>必须开启bin-log</p>
+</li>
+<li><p>必须log_replica_updates=ON </p>
+</li>
+<li><p>必须binlog_format=ROW </p>
+</li>
+<li><p>必须 gtid_mode=ON 和 enforce_gtid_consistency=ON.</p>
+</li>
+<li><p>所有组成员的 default_table_encryption 必须设置相同</p>
+</li>
+<li><p>所有组成员的 lower_case_table_names 必须设置相同</p>
+</li>
+<li><p>设置 binlog_transaction_dependency_tracking = WRITESET 和 replica_preserve_commit_order = ON</p>
+</li>
+<li><p>设置并发复制，所有组成员默认都设置并发复制默认为4. 通过 replica_parallel_workers  调整数量。最大可以1024 个</p>
+</li>
+<li><p>mysql 8.2 及以后的版本都支持 xa 事务。可以通过 xa_detach_on_prepare = ON |OFF 来开启支持或关闭</p>
+</li>
+</ol>
+<h2 id="组复制的限制"><a href="#组复制的限制" class="headerlink" title="组复制的限制"></a>组复制的限制</h2><ol>
+<li><p>组复制在使用 —upgrade=MINIMAL 的选项升级后不能启动。这个选项不升级复制依赖的一些系统表</p>
+</li>
+<li><p>组复制针对并发事务的认证过程没有考虑间隙锁，因为在InnoDB之外无法获得有关间隙锁的信息</p>
+</li>
+<li><p>表锁和命名锁。认证过程不考虑表锁</p>
+</li>
+<li><p>binlog_checksum 在8.2 以前不支持校验。设置binlog_checksum = NONE 在8.2 开始 默认为binlog_checksum=CRC32</p>
+</li>
+<li><p>不支持SERIALIZABLE 的事务隔离级别。设置为transaction_isolation = READ-COMMITTED</p>
+</li>
+<li><p>使用多主模式时，不支持针对同一对象但在不同服务器上执行的并发数据定义语句和数据操作语句。在对象上执行数据定义语言（DDL）语句期间，<br>在同一对象上但在不同的服务器实例上执行并发数据操作语言（DML）有可能检测不到在不同实例上执行的冲突DDL</p>
+</li>
+<li><p>多主模式组（所有成员都配置为group_replication_single_primary_mode=OFF）不支持具有多级外键依赖关系的表，特别是定义了CASCADING外键约束的表。<br>这是因为导致多主模式组执行级联操作的外键约束可能会导致未检测到的冲突，并导致组成员之间的数据不一致。因此，我们建议在多主模式组中使用的服务<br>器实例上设置group_replication_enforce_update_everywhere_checks=ON，以避免未检测到的冲突。单主模式下则无此风险</p>
+</li>
+<li><p>多主模式组（所有成员都配置为group_replication_single_primary_mode=OFF）不支持具有多级外键依赖关系的表，特别是定义了CASCADING外键约束的表。<br>这是因为导致多主模式组执行级联操作的外键约束可能会导致未检测到的冲突，并导致组成员之间的数据不一致。因此，我们建议在多主模式组中使用的服务<br>器实例上设置group_replication_enforce_update_everywhere_checks=ON，以避免未检测到的冲突。</p>
+</li>
+<li><p>多主模式下，在某节点上执行 SELECT。。FOR UPDATE语句可能会导致死锁。这是因为锁不是在组的成员之间共享的，因此可能无法达到对此类语句的期望</p>
+</li>
+<li><p>全局复制筛选器不能用于为组复制配置的MySQL服务器实例，因为在某些服务器上筛选事务会使组无法就一致状态达成一致。通道特定的复制筛选器可以用<br>于不直接参与组复制的复制通道，例如组成员还充当组外源的副本的情况。它们不能用于group_replication_applier或group_replification_recovery通道。</p>
+</li>
+<li><p>MySQL中提供了对TLSv1.3协议的支持，前提是它是使用OpenSSL 1.1.1或更高版本编译的。组复制支持TLSv1.3，可用于组通信连接和分布式恢复连接。</p>
+</li>
+<li><p>组复制启动并管理分布式恢复的克隆操作。但已设置为支持克隆的组成员也可以参与用户手动启动的克隆操作。如果操作涉及正在运行组复制的组成员，<br>则可以手动启动克隆操作，前提是克隆操作不会删除和替换接收方的数据。因此，如果组复制正在运行，则启动克隆操作的语句必须包括DATA DIRECTORY子句</p>
+</li>
+<li><p>组复制最多支持9个成员</p>
+</li>
+<li><p>事务大小限制<br>如果单事务太大。以至于无法在5秒内无法在组成员中复制完毕，会导致认为成员失败，而遭踢出集群。可以通过以下方法避免</p>
+<ol>
+<li>设置group_replication_member_expel_timeout 参数以获取更长的延迟时间，默认再加5秒</li>
+<li>限制事务数据的大小。比如使用 LOAD DATA 时将文件分割成更小的块</li>
+<li>设置group_replication_transaction_size_limit 限制事务数据允许的最大规格。默认是150000000 bytes，超过此规格的事务将会别回滚。并且不会分发到其他组成员</li>
+<li>设置group_replication_compression_threshold 来压缩大消息。默认1M。当大消息的最大规格限制 group_replication_transaction_size_limit 大于    group_replication_compression_threshold 时。都将会被压缩发送</li>
+<li>设置复制消息的最大规格 group_replication_communication_max_message_size 。默认是10M。超过该大小将会被分段发送。当消息被压缩后仍然超过group_replication_communication_max_message_size 后就会被分段。所有组成员数据库版本必须大于8.0.16 才允许使用分段消息</li>
+</ol>
+</li>
+</ol>
+<h2 id="安装准备"><a href="#安装准备" class="headerlink" title="安装准备"></a>安装准备</h2><p>echo “192.168.56.17    db-56-17     db-56-17” &gt;&gt;/etc/hosts<br>echo “192.168.56.18    db-56-18     db-56-18” &gt;&gt;/etc/hosts<br>echo “192.168.56.19    db-56-19     db-56-19” &gt;&gt;/etc/hosts</p>
+<h2 id="配置ssh"><a href="#配置ssh" class="headerlink" title="配置ssh"></a>配置ssh</h2><h1 id="先操作-db-56-17"><a href="#先操作-db-56-17" class="headerlink" title="先操作 db-56-17"></a>先操作 db-56-17</h1><h2 id="配置参数"><a href="#配置参数" class="headerlink" title="配置参数"></a>配置参数</h2><h3 id="必要参数配置"><a href="#必要参数配置" class="headerlink" title="必要参数配置"></a>必要参数配置</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">disabled_storage_engines<span class="operator">=</span>&quot;MyISAM,BLACKHOLE,FEDERATED,ARCHIVE,MEMORY&quot; #禁用非innodb引擎</span><br><span class="line">authentication_policy<span class="operator">=</span>mysql_native_password                          #设置密码策略</span><br></pre></td></tr></table></figure>
+<h3 id="复制框架相关"><a href="#复制框架相关" class="headerlink" title="复制框架相关"></a>复制框架相关</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">server<span class="operator">-</span>id <span class="operator">=</span> <span class="number">17</span>                                                       #每个实例不同</span><br><span class="line">log_replica_updates <span class="operator">=</span> <span class="literal">true</span>                                           #打开复制更新binlog</span><br><span class="line">gtid_mode<span class="operator">=</span><span class="keyword">ON</span>                                                         #打开GTID</span><br><span class="line">enforce_gtid_consistency<span class="operator">=</span><span class="keyword">ON</span>                                          #强制gtid 一致性</span><br></pre></td></tr></table></figure>
+<h3 id="组复制相关参数"><a href="#组复制相关参数" class="headerlink" title="组复制相关参数"></a>组复制相关参数</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">plugin_load_add <span class="operator">=</span> &quot;group_replication.so&quot;                             #加载组复制插件</span><br><span class="line">binlog_checksum <span class="operator">=</span> <span class="keyword">NONE</span>                                               #设置为<span class="keyword">NONE</span> ，<span class="number">8.2</span> 以后可以设置为</span><br><span class="line">group_replication_group_name<span class="operator">=</span>&quot;aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa&quot;  #复制组名。集群中所有的节点复制组名都一致。必须是个uuid 。可以通过<span class="keyword">select</span> uuid() 获取，也可以写&quot;aaaa-aa....&quot;</span><br><span class="line">group_replication_start_on_boot<span class="operator">=</span>off                                  #设置插件不要在服务器启动时自动启动。在配置组复制集群时非常重要。因为可以在启动插件前配置服务。</span><br><span class="line">                                                                     #当配置成员后。可以设置为<span class="keyword">on</span></span><br><span class="line">group_replication_local_address<span class="operator">=</span> &quot;db-56-17:33061&quot;                    #设置本机用于组复制内部成员沟通地址 。为主机名或ip加端口号。建议使用<span class="number">33061</span> ，该地址不能和客户端访问数据库一样，</span><br><span class="line">                                                                     #组成员之间的local_address 均不一样</span><br><span class="line">group_replication_group_seeds<span class="operator">=</span> &quot;db-56-17:33061,db-56-18:33061,db-56-19:33061&quot; #设置复制组成员的地址。用于新节点加入时，可以通过这些地址建立连接。里面的成员也称为种子成员。</span><br><span class="line">                                                                     #里面的地址为local_address 设置的地址。并不一定所有的成员都需要列在种子成员中。它是组成员的子集</span><br><span class="line">																	 #同时加入多个成员时。必须确保种子成员都已经加入组。不要将同时加入的成员作为种子成员。因为当连接到他们时，他们可能</span><br><span class="line">																	 #还没在组中。</span><br><span class="line">group_replication_bootstrap_group<span class="operator">=</span>off                                #指示插件是否引导组，即使是第一个成员也设置为关闭。我们在配置时手动启动它。引导结束后再关闭它。</span><br><span class="line">                                                                     #如果在多个成员上打开引导组。会造成脑裂。所以在第一个成员引导结束之后。所有其他成员都不要再打开它</span><br></pre></td></tr></table></figure>
+<h3 id="注意"><a href="#注意" class="headerlink" title="注意"></a>注意</h3><p>当使用mysqld_multi 多实例启动时，组复制的相关参数要写在[mysqldn]下。否则相关参数都不生效</p>
+<h2 id="配置组复制"><a href="#配置组复制" class="headerlink" title="配置组复制"></a>配置组复制</h2><h3 id="初始化数据库实例"><a href="#初始化数据库实例" class="headerlink" title="初始化数据库实例"></a>初始化数据库实例</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">mysqld --initialize --user=mysql --basedir=/usr/local/mysql --datadir=/usr/local/mysql/data_sheen</span><br><span class="line">修改root 密码</span><br></pre></td></tr></table></figure>
+<h3 id="启动数据库"><a href="#启动数据库" class="headerlink" title="启动数据库"></a>启动数据库</h3><p>mysqld_multi start 1</p>
+<h3 id="查看组复制插件是否已启动。"><a href="#查看组复制插件是否已启动。" class="headerlink" title="查看组复制插件是否已启动。"></a>查看组复制插件是否已启动。</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">root@localhost:(none)&gt;show plugins;</span><br><span class="line">....</span><br><span class="line">| mysql_native_password            | ACTIVE   | AUTHENTICATION     | NULL                 | GPL     |</span><br><span class="line">| group_replication                | ACTIVE   | GROUP REPLICATION  | group_replication.so | GPL     |</span><br><span class="line">+----------------------------------+----------+--------------------+----------------------+---------+</span><br></pre></td></tr></table></figure>
+<h3 id="如果没有启动则安装组复制插件"><a href="#如果没有启动则安装组复制插件" class="headerlink" title="如果没有启动则安装组复制插件"></a>如果没有启动则安装组复制插件</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">INSTALL PLUGIN group_replication SONAME <span class="string">&#x27;group_replication.so&#x27;</span>;</span><br></pre></td></tr></table></figure>
+<h3 id="创建复制账号"><a href="#创建复制账号" class="headerlink" title="创建复制账号"></a>创建复制账号</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SET</span> SQL_LOG_BIN<span class="operator">=</span><span class="number">0</span>;    # 关闭操作写入binlog 这里设置不要将权限账号写入binlog,避免在不同实例加入时冲突</span><br><span class="line"><span class="keyword">create</span> <span class="keyword">user</span> <span class="string">&#x27;repl&#x27;</span>@<span class="string">&#x27;%&#x27;</span> identified <span class="keyword">by</span> <span class="string">&#x27;repl&#x27;</span>;  </span><br><span class="line"><span class="keyword">GRANT</span> REPLICATION SLAVE <span class="keyword">ON</span> <span class="operator">*</span>.<span class="operator">*</span> <span class="keyword">TO</span> <span class="string">&#x27;repl&#x27;</span>@<span class="string">&#x27;%&#x27;</span>;   #replica 的复制权限</span><br><span class="line"><span class="keyword">GRANT</span> CONNECTION_ADMIN <span class="keyword">ON</span> <span class="operator">*</span>.<span class="operator">*</span> <span class="keyword">TO</span> <span class="string">&#x27;repl&#x27;</span>@<span class="string">&#x27;%&#x27;</span>;    #它确保在涉及的服务器之一处于脱机模式时不会终止组复制连接</span><br><span class="line"><span class="keyword">GRANT</span> BACKUP_ADMIN <span class="keyword">ON</span> <span class="operator">*</span>.<span class="operator">*</span> <span class="keyword">TO</span> <span class="string">&#x27;repl&#x27;</span>@<span class="string">&#x27;%&#x27;</span>;        #如果组复制中支持克隆。这是克隆所需的权限</span><br><span class="line"><span class="keyword">GRANT</span> GROUP_REPLICATION_STREAM <span class="keyword">ON</span> <span class="operator">*</span>.<span class="operator">*</span> <span class="keyword">TO</span> <span class="string">&#x27;repl&#x27;</span>@<span class="string">&#x27;%&#x27;</span>; #此权限是用户帐户使用MySQL通信堆栈建立和维护组复制连接所必需的</span><br><span class="line">FLUSH PRIVILEGES;</span><br><span class="line"><span class="keyword">SET</span> SQL_LOG_BIN<span class="operator">=</span><span class="number">1</span>;    #开启<span class="keyword">SQL</span> 写入binlog </span><br></pre></td></tr></table></figure>
+<h3 id="设置组复制用于分布式恢复用户数据的凭证为-group-replication-recovery"><a href="#设置组复制用于分布式恢复用户数据的凭证为-group-replication-recovery" class="headerlink" title="设置组复制用于分布式恢复用户数据的凭证为 group_replication_recovery"></a>设置组复制用于分布式恢复用户数据的凭证为 group_replication_recovery</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CHANGE REPLICATION SOURCE <span class="keyword">TO</span> SOURCE_USER<span class="operator">=</span><span class="string">&#x27;repl&#x27;</span>, SOURCE_PASSWORD<span class="operator">=</span><span class="string">&#x27;repl&#x27;</span> <span class="keyword">FOR</span> CHANNEL <span class="string">&#x27;group_replication_recovery&#x27;</span>;</span><br></pre></td></tr></table></figure>
+<h3 id="第一个节点启用引导，启动组复制"><a href="#第一个节点启用引导，启动组复制" class="headerlink" title="第一个节点启用引导，启动组复制"></a>第一个节点启用引导，启动组复制</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SET</span> <span class="keyword">GLOBAL</span> group_replication_bootstrap_group<span class="operator">=</span><span class="keyword">ON</span>;   #启动引导</span><br><span class="line"><span class="keyword">START</span> GROUP_REPLICATION <span class="keyword">USER</span><span class="operator">=</span><span class="string">&#x27;repl&#x27;</span>, PASSWORD<span class="operator">=</span><span class="string">&#x27;repl&#x27;</span>;  #启动组复制</span><br><span class="line"><span class="keyword">SET</span> <span class="keyword">GLOBAL</span> group_replication_bootstrap_group<span class="operator">=</span>OFF;  #关闭引导</span><br></pre></td></tr></table></figure>
+<h3 id="查看组成员"><a href="#查看组成员" class="headerlink" title="查看组成员"></a>查看组成员</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">root<span class="variable">@localhost</span>:(<span class="keyword">none</span>)<span class="operator">&gt;</span><span class="keyword">SELECT</span> <span class="operator">*</span> <span class="keyword">FROM</span> performance_schema.replication_group_members;</span><br><span class="line"><span class="operator">+</span><span class="comment">---------------------------+--------------------------------------+-------------+-------------+--------------+-------------+----------------+----------------------------+</span></span><br><span class="line"><span class="operator">|</span> CHANNEL_NAME              <span class="operator">|</span> MEMBER_ID                            <span class="operator">|</span> MEMBER_HOST <span class="operator">|</span> MEMBER_PORT <span class="operator">|</span> MEMBER_STATE <span class="operator">|</span> MEMBER_ROLE <span class="operator">|</span> MEMBER_VERSION <span class="operator">|</span> MEMBER_COMMUNICATION_STACK <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">---------------------------+--------------------------------------+-------------+-------------+--------------+-------------+----------------+----------------------------+</span></span><br><span class="line"><span class="operator">|</span> group_replication_applier <span class="operator">|</span> <span class="number">0</span>ecaadea<span class="number">-9</span>fc7<span class="number">-11</span>ee<span class="number">-8099</span><span class="number">-080027128</span>c74 <span class="operator">|</span> db<span class="number">-56</span><span class="number">-17</span>    <span class="operator">|</span>        <span class="number">3306</span> <span class="operator">|</span> ONLINE       <span class="operator">|</span> <span class="keyword">PRIMARY</span>     <span class="operator">|</span> <span class="number">8.2</span><span class="number">.0</span>          <span class="operator">|</span> XCom                       <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">---------------------------+--------------------------------------+-------------+-------------+--------------+-------------+----------------+----------------------------+</span></span><br></pre></td></tr></table></figure>
+<h1 id="操作-db-56-18-使其加入组"><a href="#操作-db-56-18-使其加入组" class="headerlink" title="操作 db-56-18 ,使其加入组"></a>操作 db-56-18 ,使其加入组</h1><h2 id="参数配置。"><a href="#参数配置。" class="headerlink" title="参数配置。"></a>参数配置。</h2><h3 id="将-db-56-17-的配置文件复制到-db-56-18"><a href="#将-db-56-17-的配置文件复制到-db-56-18" class="headerlink" title="将 db-56-17 的配置文件复制到 db-56-18"></a>将 db-56-17 的配置文件复制到 db-56-18</h3><h3 id="在-db-56-18-上修改下面2个参数的值"><a href="#在-db-56-18-上修改下面2个参数的值" class="headerlink" title="在 db-56-18 上修改下面2个参数的值"></a>在 db-56-18 上修改下面2个参数的值</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">server<span class="operator">-</span>id <span class="operator">=</span> <span class="number">18</span></span><br><span class="line">group_replication_local_address<span class="operator">=</span> &quot;db-56-18:33061&quot;</span><br></pre></td></tr></table></figure>
+<h3 id="初始化数据库实例-1"><a href="#初始化数据库实例-1" class="headerlink" title="初始化数据库实例"></a>初始化数据库实例</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">mysqld --initialize --user=mysql --basedir=/usr/local/mysql --datadir=/usr/local/mysql/data_sheen</span><br><span class="line">修改root 密码</span><br></pre></td></tr></table></figure>
+<h3 id="启动数据库-1"><a href="#启动数据库-1" class="headerlink" title="启动数据库"></a>启动数据库</h3><p>mysqld_multi start 1</p>
+<h3 id="检查插件并设置复制账号"><a href="#检查插件并设置复制账号" class="headerlink" title="检查插件并设置复制账号"></a>检查插件并设置复制账号</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">show</span> plugins;</span><br><span class="line"><span class="keyword">SET</span> SQL_LOG_BIN<span class="operator">=</span><span class="number">0</span>;</span><br><span class="line"><span class="keyword">create</span> <span class="keyword">user</span> <span class="string">&#x27;repl&#x27;</span>@<span class="string">&#x27;%&#x27;</span> identified <span class="keyword">by</span> <span class="string">&#x27;repl&#x27;</span>;  </span><br><span class="line"><span class="keyword">GRANT</span> REPLICATION SLAVE <span class="keyword">ON</span> <span class="operator">*</span>.<span class="operator">*</span> <span class="keyword">TO</span> <span class="string">&#x27;repl&#x27;</span>@<span class="string">&#x27;%&#x27;</span>;</span><br><span class="line"><span class="keyword">GRANT</span> CONNECTION_ADMIN <span class="keyword">ON</span> <span class="operator">*</span>.<span class="operator">*</span> <span class="keyword">TO</span> <span class="string">&#x27;repl&#x27;</span>@<span class="string">&#x27;%&#x27;</span>;</span><br><span class="line"><span class="keyword">GRANT</span> BACKUP_ADMIN <span class="keyword">ON</span> <span class="operator">*</span>.<span class="operator">*</span> <span class="keyword">TO</span> <span class="string">&#x27;repl&#x27;</span>@<span class="string">&#x27;%&#x27;</span>;</span><br><span class="line"><span class="keyword">GRANT</span> GROUP_REPLICATION_STREAM <span class="keyword">ON</span> <span class="operator">*</span>.<span class="operator">*</span> <span class="keyword">TO</span> <span class="string">&#x27;repl&#x27;</span>@<span class="string">&#x27;%&#x27;</span>;</span><br><span class="line">FLUSH PRIVILEGES;</span><br><span class="line"><span class="keyword">SET</span> SQL_LOG_BIN<span class="operator">=</span><span class="number">1</span>;</span><br></pre></td></tr></table></figure>
+<h3 id="因为我们是新开的实例。在加入复制组时需要重置掉本地的gtid信息"><a href="#因为我们是新开的实例。在加入复制组时需要重置掉本地的gtid信息" class="headerlink" title="因为我们是新开的实例。在加入复制组时需要重置掉本地的gtid信息"></a>因为我们是新开的实例。在加入复制组时需要重置掉本地的gtid信息</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">reset master</span><br></pre></td></tr></table></figure>
+<h3 id="设置组复制用于分布式恢复用户数据的凭证为-group-replication-recovery-1"><a href="#设置组复制用于分布式恢复用户数据的凭证为-group-replication-recovery-1" class="headerlink" title="设置组复制用于分布式恢复用户数据的凭证为 group_replication_recovery"></a>设置组复制用于分布式恢复用户数据的凭证为 group_replication_recovery</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CHANGE REPLICATION SOURCE <span class="keyword">TO</span> SOURCE_USER<span class="operator">=</span><span class="string">&#x27;repl&#x27;</span>, SOURCE_PASSWORD<span class="operator">=</span><span class="string">&#x27;repl&#x27;</span> <span class="keyword">FOR</span> CHANNEL <span class="string">&#x27;group_replication_recovery&#x27;</span>;</span><br></pre></td></tr></table></figure>
+<h3 id="启动组复制-这里与节点1有所不同，仅启动组复制，不要开启组引导"><a href="#启动组复制-这里与节点1有所不同，仅启动组复制，不要开启组引导" class="headerlink" title="启动组复制(这里与节点1有所不同，仅启动组复制，不要开启组引导)"></a>启动组复制(这里与节点1有所不同，仅启动组复制，不要开启组引导)</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">START</span> GROUP_REPLICATION <span class="keyword">USER</span><span class="operator">=</span><span class="string">&#x27;rpl_user&#x27;</span>, PASSWORD<span class="operator">=</span><span class="string">&#x27;password&#x27;</span>; ## 当成功启动组复制并加入复制组。将会将该节点设置为super_read_only<span class="operator">=</span><span class="keyword">ON</span> 不允许修改</span><br></pre></td></tr></table></figure>
+<h3 id="查看组成员-1"><a href="#查看组成员-1" class="headerlink" title="查看组成员"></a>查看组成员</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">root<span class="variable">@localhost</span>:(<span class="keyword">none</span>)<span class="operator">&gt;</span><span class="keyword">SELECT</span> <span class="operator">*</span> <span class="keyword">FROM</span> performance_schema.replication_group_members;</span><br><span class="line"><span class="operator">+</span><span class="comment">---------------------------+--------------------------------------+-------------+-------------+--------------+-------------+----------------+----------------------------+</span></span><br><span class="line"><span class="operator">|</span> CHANNEL_NAME              <span class="operator">|</span> MEMBER_ID                            <span class="operator">|</span> MEMBER_HOST <span class="operator">|</span> MEMBER_PORT <span class="operator">|</span> MEMBER_STATE <span class="operator">|</span> MEMBER_ROLE <span class="operator">|</span> MEMBER_VERSION <span class="operator">|</span> MEMBER_COMMUNICATION_STACK <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">---------------------------+--------------------------------------+-------------+-------------+--------------+-------------+----------------+----------------------------+</span></span><br><span class="line"><span class="operator">|</span> group_replication_applier <span class="operator">|</span> <span class="number">0</span>ecaadea<span class="number">-9</span>fc7<span class="number">-11</span>ee<span class="number">-8099</span><span class="number">-080027128</span>c74 <span class="operator">|</span> db<span class="number">-56</span><span class="number">-17</span>    <span class="operator">|</span>        <span class="number">3306</span> <span class="operator">|</span> ONLINE       <span class="operator">|</span> <span class="keyword">PRIMARY</span>     <span class="operator">|</span> <span class="number">8.2</span><span class="number">.0</span>          <span class="operator">|</span> XCom                       <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> group_replication_applier <span class="operator">|</span> <span class="number">1</span>bb739ac<span class="number">-9</span>fc7<span class="number">-11</span>ee<span class="operator">-</span>bc56<span class="number">-080027e817</span>da <span class="operator">|</span> db<span class="number">-56</span><span class="number">-18</span>    <span class="operator">|</span>        <span class="number">3306</span> <span class="operator">|</span> ONLINE       <span class="operator">|</span> SECONDARY   <span class="operator">|</span> <span class="number">8.2</span><span class="number">.0</span>          <span class="operator">|</span> XCom                       <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">---------------------------+--------------------------------------+-------------+-------------+--------------+-------------+----------------+----------------------------+</span></span><br></pre></td></tr></table></figure>
+<h1 id="操作-db-56-19-使其加入组"><a href="#操作-db-56-19-使其加入组" class="headerlink" title="操作 db-56-19 ,使其加入组"></a>操作 db-56-19 ,使其加入组</h1><h2 id="参数配置。-1"><a href="#参数配置。-1" class="headerlink" title="参数配置。"></a>参数配置。</h2><h3 id="将-db-56-17-的配置文件复制到-db-56-19"><a href="#将-db-56-17-的配置文件复制到-db-56-19" class="headerlink" title="将 db-56-17 的配置文件复制到 db-56-19"></a>将 db-56-17 的配置文件复制到 db-56-19</h3><h3 id="在-db-56-19-上修改下面2个参数的值"><a href="#在-db-56-19-上修改下面2个参数的值" class="headerlink" title="在 db-56-19 上修改下面2个参数的值"></a>在 db-56-19 上修改下面2个参数的值</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">server<span class="operator">-</span>id <span class="operator">=</span> <span class="number">19</span></span><br><span class="line">group_replication_local_address<span class="operator">=</span> &quot;db-56-19:33061&quot;  </span><br></pre></td></tr></table></figure>
+<h3 id="初始化数据库实例-2"><a href="#初始化数据库实例-2" class="headerlink" title="初始化数据库实例"></a>初始化数据库实例</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">mysqld --initialize --user=mysql --basedir=/usr/local/mysql --datadir=/usr/local/mysql/data_sheen</span><br><span class="line">修改root 密码</span><br></pre></td></tr></table></figure>
+<h3 id="启动数据库-2"><a href="#启动数据库-2" class="headerlink" title="启动数据库"></a>启动数据库</h3><p>mysqld_multi start 1</p>
+<h3 id="检查插件并设置复制账号-1"><a href="#检查插件并设置复制账号-1" class="headerlink" title="检查插件并设置复制账号"></a>检查插件并设置复制账号</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">show</span> plugins;</span><br><span class="line"><span class="keyword">SET</span> SQL_LOG_BIN<span class="operator">=</span><span class="number">0</span>;</span><br><span class="line"><span class="keyword">create</span> <span class="keyword">user</span> <span class="string">&#x27;repl&#x27;</span>@<span class="string">&#x27;%&#x27;</span> identified <span class="keyword">by</span> <span class="string">&#x27;repl&#x27;</span>;  </span><br><span class="line"><span class="keyword">GRANT</span> REPLICATION SLAVE <span class="keyword">ON</span> <span class="operator">*</span>.<span class="operator">*</span> <span class="keyword">TO</span> <span class="string">&#x27;repl&#x27;</span>@<span class="string">&#x27;%&#x27;</span>;</span><br><span class="line"><span class="keyword">GRANT</span> CONNECTION_ADMIN <span class="keyword">ON</span> <span class="operator">*</span>.<span class="operator">*</span> <span class="keyword">TO</span> <span class="string">&#x27;repl&#x27;</span>@<span class="string">&#x27;%&#x27;</span>;</span><br><span class="line"><span class="keyword">GRANT</span> BACKUP_ADMIN <span class="keyword">ON</span> <span class="operator">*</span>.<span class="operator">*</span> <span class="keyword">TO</span> <span class="string">&#x27;repl&#x27;</span>@<span class="string">&#x27;%&#x27;</span>;</span><br><span class="line"><span class="keyword">GRANT</span> GROUP_REPLICATION_STREAM <span class="keyword">ON</span> <span class="operator">*</span>.<span class="operator">*</span> <span class="keyword">TO</span> <span class="string">&#x27;repl&#x27;</span>@<span class="string">&#x27;%&#x27;</span>;</span><br><span class="line">FLUSH PRIVILEGES;</span><br><span class="line"><span class="keyword">SET</span> SQL_LOG_BIN<span class="operator">=</span><span class="number">1</span>;</span><br></pre></td></tr></table></figure>
+<h3 id="因为我们是新开的实例。在加入复制组时需要重置掉本地的gtid信息-1"><a href="#因为我们是新开的实例。在加入复制组时需要重置掉本地的gtid信息-1" class="headerlink" title="因为我们是新开的实例。在加入复制组时需要重置掉本地的gtid信息"></a>因为我们是新开的实例。在加入复制组时需要重置掉本地的gtid信息</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">reset master     </span><br></pre></td></tr></table></figure>
+<h3 id="设置组复制用于分布式恢复用户数据的凭证为-group-replication-recovery-2"><a href="#设置组复制用于分布式恢复用户数据的凭证为-group-replication-recovery-2" class="headerlink" title="设置组复制用于分布式恢复用户数据的凭证为 group_replication_recovery"></a>设置组复制用于分布式恢复用户数据的凭证为 group_replication_recovery</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CHANGE REPLICATION SOURCE <span class="keyword">TO</span> SOURCE_USER<span class="operator">=</span><span class="string">&#x27;repl&#x27;</span>, SOURCE_PASSWORD<span class="operator">=</span><span class="string">&#x27;repl&#x27;</span> <span class="keyword">FOR</span> CHANNEL <span class="string">&#x27;group_replication_recovery&#x27;</span>;</span><br></pre></td></tr></table></figure>
+<h3 id="启动组复制-这里与节点1有所不同，仅启动组复制，不要开启组引导-1"><a href="#启动组复制-这里与节点1有所不同，仅启动组复制，不要开启组引导-1" class="headerlink" title="启动组复制(这里与节点1有所不同，仅启动组复制，不要开启组引导)"></a>启动组复制(这里与节点1有所不同，仅启动组复制，不要开启组引导)</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">START</span> GROUP_REPLICATION <span class="keyword">USER</span><span class="operator">=</span><span class="string">&#x27;rpl_user&#x27;</span>, PASSWORD<span class="operator">=</span><span class="string">&#x27;password&#x27;</span>; </span><br><span class="line"></span><br><span class="line">root<span class="variable">@localhost</span>:(<span class="keyword">none</span>)<span class="operator">&gt;</span><span class="keyword">SELECT</span> <span class="operator">*</span> <span class="keyword">FROM</span> performance_schema.replication_group_members;</span><br><span class="line"><span class="operator">+</span><span class="comment">---------------------------+--------------------------------------+-------------+-------------+--------------+-------------+----------------+----------------------------+</span></span><br><span class="line"><span class="operator">|</span> CHANNEL_NAME              <span class="operator">|</span> MEMBER_ID                            <span class="operator">|</span> MEMBER_HOST <span class="operator">|</span> MEMBER_PORT <span class="operator">|</span> MEMBER_STATE <span class="operator">|</span> MEMBER_ROLE <span class="operator">|</span> MEMBER_VERSION <span class="operator">|</span> MEMBER_COMMUNICATION_STACK <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">---------------------------+--------------------------------------+-------------+-------------+--------------+-------------+----------------+----------------------------+</span></span><br><span class="line"><span class="operator">|</span> group_replication_applier <span class="operator">|</span> <span class="number">0</span>ecaadea<span class="number">-9</span>fc7<span class="number">-11</span>ee<span class="number">-8099</span><span class="number">-080027128</span>c74 <span class="operator">|</span> db<span class="number">-56</span><span class="number">-17</span>    <span class="operator">|</span>        <span class="number">3306</span> <span class="operator">|</span> ONLINE       <span class="operator">|</span> <span class="keyword">PRIMARY</span>     <span class="operator">|</span> <span class="number">8.2</span><span class="number">.0</span>          <span class="operator">|</span> XCom                       <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> group_replication_applier <span class="operator">|</span> <span class="number">159504</span>c3<span class="number">-9</span>fc7<span class="number">-11</span>ee<span class="number">-803</span>b<span class="number">-080027</span>fd716e <span class="operator">|</span> db<span class="number">-56</span><span class="number">-19</span>    <span class="operator">|</span>        <span class="number">3306</span> <span class="operator">|</span> ONLINE       <span class="operator">|</span> SECONDARY   <span class="operator">|</span> <span class="number">8.2</span><span class="number">.0</span>          <span class="operator">|</span> XCom                       <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> group_replication_applier <span class="operator">|</span> <span class="number">1</span>bb739ac<span class="number">-9</span>fc7<span class="number">-11</span>ee<span class="operator">-</span>bc56<span class="number">-080027e817</span>da <span class="operator">|</span> db<span class="number">-56</span><span class="number">-18</span>    <span class="operator">|</span>        <span class="number">3306</span> <span class="operator">|</span> ONLINE       <span class="operator">|</span> SECONDARY   <span class="operator">|</span> <span class="number">8.2</span><span class="number">.0</span>          <span class="operator">|</span> XCom                       <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">---------------------------+--------------------------------------+-------------+-------------+--------------+-------------+----------------+----------------------------+</span></span><br></pre></td></tr></table></figure>
+<h2 id="数据测试"><a href="#数据测试" class="headerlink" title="数据测试"></a>数据测试</h2><p>在节点db-56-17 上建库。写入数据<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">create</span> database test</span><br><span class="line">use test</span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> t1 (c1 <span class="type">INT</span> <span class="keyword">PRIMARY</span> KEY, c2 TEXT <span class="keyword">NOT</span> <span class="keyword">NULL</span>);</span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> t1 <span class="keyword">VALUES</span> (<span class="number">1</span>, <span class="string">&#x27;Luis&#x27;</span>);</span><br></pre></td></tr></table></figure><br>在节点db-56-18 ,db-56-19 查看数据是否同步<br><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">show</span> databases;</span><br><span class="line">root<span class="variable">@localhost</span>:(<span class="keyword">none</span>)<span class="operator">&gt;</span>use test;</span><br><span class="line">Database changed</span><br><span class="line">root<span class="variable">@localhost</span>:test<span class="operator">&gt;</span><span class="keyword">select</span> <span class="operator">*</span> <span class="keyword">from</span> t1;</span><br><span class="line"><span class="operator">+</span><span class="comment">----+------+</span></span><br><span class="line"><span class="operator">|</span> c1 <span class="operator">|</span> c2   <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">----+------+</span></span><br><span class="line"><span class="operator">|</span>  <span class="number">1</span> <span class="operator">|</span> Luis <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">----+------+</span></span><br><span class="line"></span><br><span class="line">root<span class="variable">@localhost</span>:(<span class="keyword">none</span>)<span class="operator">&gt;</span><span class="keyword">show</span> binlog events;</span><br><span class="line"><span class="operator">+</span><span class="comment">------------------+------+----------------+-----------+-------------+-----------------------------------------------------------------------------------------------------------------------------------+</span></span><br><span class="line"><span class="operator">|</span> Log_name         <span class="operator">|</span> Pos  <span class="operator">|</span> Event_type     <span class="operator">|</span> Server_id <span class="operator">|</span> End_log_pos <span class="operator">|</span> Info                                                                                                                              <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">------------------+------+----------------+-----------+-------------+-----------------------------------------------------------------------------------------------------------------------------------+</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span>    <span class="number">4</span> <span class="operator">|</span> Format_desc    <span class="operator">|</span>        <span class="number">19</span> <span class="operator">|</span>         <span class="number">126</span> <span class="operator">|</span> Server ver: <span class="number">8.2</span><span class="number">.0</span>, Binlog ver: <span class="number">4</span>                                                                                                  <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span>  <span class="number">126</span> <span class="operator">|</span> Previous_gtids <span class="operator">|</span>        <span class="number">19</span> <span class="operator">|</span>         <span class="number">153</span> <span class="operator">|</span>                                                                                                                                   <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span>  <span class="number">153</span> <span class="operator">|</span> Gtid           <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>         <span class="number">235</span> <span class="operator">|</span> <span class="keyword">SET</span> @<span class="variable">@SESSION</span>.GTID_NEXT<span class="operator">=</span> <span class="string">&#x27;0ecaadea-9fc7-11ee-8099-080027128c74:1&#x27;</span>                                                                 <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span>  <span class="number">235</span> <span class="operator">|</span> Query          <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>         <span class="number">442</span> <span class="operator">|</span> <span class="keyword">ALTER</span> <span class="keyword">USER</span> <span class="string">&#x27;root&#x27;</span>@<span class="string">&#x27;localhost&#x27;</span> IDENTIFIED <span class="keyword">WITH</span> <span class="string">&#x27;mysql_native_password&#x27;</span> <span class="keyword">AS</span> <span class="string">&#x27;*2632CF75CFB8987B429348FA90905C86DF24D0A7&#x27;</span> <span class="comment">/* xid=23 */</span> <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span>  <span class="number">442</span> <span class="operator">|</span> Gtid           <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>         <span class="number">524</span> <span class="operator">|</span> <span class="keyword">SET</span> @<span class="variable">@SESSION</span>.GTID_NEXT<span class="operator">=</span> <span class="string">&#x27;8332185e-9f15-11ee-8831-080027128c74:1&#x27;</span>                                                                 <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span>  <span class="number">524</span> <span class="operator">|</span> Query          <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>         <span class="number">586</span> <span class="operator">|</span> <span class="keyword">BEGIN</span>                                                                                                                             <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span>  <span class="number">586</span> <span class="operator">|</span> View_change    <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>         <span class="number">725</span> <span class="operator">|</span> view_id<span class="operator">=</span><span class="number">17031392240567592</span>:<span class="number">1</span>                                                                                                       <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span>  <span class="number">725</span> <span class="operator">|</span> Query          <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>         <span class="number">793</span> <span class="operator">|</span> <span class="keyword">COMMIT</span>                                                                                                                            <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span>  <span class="number">793</span> <span class="operator">|</span> Gtid           <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>         <span class="number">875</span> <span class="operator">|</span> <span class="keyword">SET</span> @<span class="variable">@SESSION</span>.GTID_NEXT<span class="operator">=</span> <span class="string">&#x27;8332185e-9f15-11ee-8831-080027128c74:2&#x27;</span>                                                                 <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span>  <span class="number">875</span> <span class="operator">|</span> Query          <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>         <span class="number">937</span> <span class="operator">|</span> <span class="keyword">BEGIN</span>                                                                                                                             <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span>  <span class="number">937</span> <span class="operator">|</span> View_change    <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>        <span class="number">1116</span> <span class="operator">|</span> view_id<span class="operator">=</span><span class="number">17031392240567592</span>:<span class="number">2</span>                                                                                                       <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span> <span class="number">1116</span> <span class="operator">|</span> Query          <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>        <span class="number">1184</span> <span class="operator">|</span> <span class="keyword">COMMIT</span>                                                                                                                            <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span> <span class="number">1184</span> <span class="operator">|</span> Gtid           <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>        <span class="number">1266</span> <span class="operator">|</span> <span class="keyword">SET</span> @<span class="variable">@SESSION</span>.GTID_NEXT<span class="operator">=</span> <span class="string">&#x27;8332185e-9f15-11ee-8831-080027128c74:3&#x27;</span>                                                                 <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span> <span class="number">1266</span> <span class="operator">|</span> Query          <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>        <span class="number">1328</span> <span class="operator">|</span> <span class="keyword">BEGIN</span>                                                                                                                             <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span> <span class="number">1328</span> <span class="operator">|</span> View_change    <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>        <span class="number">1507</span> <span class="operator">|</span> view_id<span class="operator">=</span><span class="number">17031392240567592</span>:<span class="number">4</span>                                                                                                       <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span> <span class="number">1507</span> <span class="operator">|</span> Query          <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>        <span class="number">1575</span> <span class="operator">|</span> <span class="keyword">COMMIT</span>                                                                                                                            <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span> <span class="number">1575</span> <span class="operator">|</span> Gtid           <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>        <span class="number">1657</span> <span class="operator">|</span> <span class="keyword">SET</span> @<span class="variable">@SESSION</span>.GTID_NEXT<span class="operator">=</span> <span class="string">&#x27;8332185e-9f15-11ee-8831-080027128c74:4&#x27;</span>                                                                 <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span> <span class="number">1657</span> <span class="operator">|</span> Query          <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>        <span class="number">1719</span> <span class="operator">|</span> <span class="keyword">BEGIN</span>                                                                                                                             <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span> <span class="number">1719</span> <span class="operator">|</span> View_change    <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>        <span class="number">1898</span> <span class="operator">|</span> view_id<span class="operator">=</span><span class="number">17031392240567592</span>:<span class="number">5</span>                                                                                                       <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span> <span class="number">1898</span> <span class="operator">|</span> Query          <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>        <span class="number">1966</span> <span class="operator">|</span> <span class="keyword">COMMIT</span>                                                                                                                            <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span> <span class="number">1966</span> <span class="operator">|</span> Gtid           <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>        <span class="number">2046</span> <span class="operator">|</span> <span class="keyword">SET</span> @<span class="variable">@SESSION</span>.GTID_NEXT<span class="operator">=</span> <span class="string">&#x27;8332185e-9f15-11ee-8831-080027128c74:5&#x27;</span>                                                                 <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span> <span class="number">2046</span> <span class="operator">|</span> Query          <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>        <span class="number">2150</span> <span class="operator">|</span> <span class="keyword">create</span> database test <span class="comment">/* xid=34 */</span>                                                                                                 <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span> <span class="number">2150</span> <span class="operator">|</span> Gtid           <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>        <span class="number">2230</span> <span class="operator">|</span> <span class="keyword">SET</span> @<span class="variable">@SESSION</span>.GTID_NEXT<span class="operator">=</span> <span class="string">&#x27;8332185e-9f15-11ee-8831-080027128c74:6&#x27;</span>                                                                 <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span> <span class="number">2230</span> <span class="operator">|</span> Query          <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>        <span class="number">2369</span> <span class="operator">|</span> use `test`; <span class="keyword">create</span> <span class="keyword">table</span>  t1 (c1 <span class="type">INT</span> <span class="keyword">PRIMARY</span> KEY, c2 TEXT <span class="keyword">NOT</span> <span class="keyword">NULL</span>) <span class="comment">/* xid=35 */</span>                                                  <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span> <span class="number">2369</span> <span class="operator">|</span> Gtid           <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>        <span class="number">2451</span> <span class="operator">|</span> <span class="keyword">SET</span> @<span class="variable">@SESSION</span>.GTID_NEXT<span class="operator">=</span> <span class="string">&#x27;8332185e-9f15-11ee-8831-080027128c74:7&#x27;</span>                                                                 <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span> <span class="number">2451</span> <span class="operator">|</span> Query          <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>        <span class="number">2517</span> <span class="operator">|</span> <span class="keyword">BEGIN</span>                                                                                                                             <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span> <span class="number">2517</span> <span class="operator">|</span> Rows_query     <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>        <span class="number">2570</span> <span class="operator">|</span> # <span class="keyword">INSERT</span> <span class="keyword">INTO</span> t1 <span class="keyword">VALUES</span> (<span class="number">1</span>, <span class="string">&#x27;Luis&#x27;</span>)                                                                                               <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span> <span class="number">2570</span> <span class="operator">|</span> Table_map      <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>        <span class="number">2619</span> <span class="operator">|</span> table_id: <span class="number">144</span> (test.t1)                                                                                                           <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span> <span class="number">2619</span> <span class="operator">|</span> Write_rows     <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>        <span class="number">2661</span> <span class="operator">|</span> table_id: <span class="number">144</span> flags: STMT_END_F                                                                                                   <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span> <span class="number">2661</span> <span class="operator">|</span> Xid            <span class="operator">|</span>        <span class="number">17</span> <span class="operator">|</span>        <span class="number">2688</span> <span class="operator">|</span> <span class="keyword">COMMIT</span> <span class="comment">/* xid=37 */</span>                                                                                                               <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">------------------+------+----------------+-----------+-------------+-----------------------------------------------------------------------------------------------------------------------------------+</span></span><br></pre></td></tr></table></figure></p>
+<h2 id="出现错误及解决方案"><a href="#出现错误及解决方案" class="headerlink" title="出现错误及解决方案"></a>出现错误及解决方案</h2><h4 id="错误1-Plugin-group-replication-reported-‘The-group-replication-group-name-option-is-mandatory’"><a href="#错误1-Plugin-group-replication-reported-‘The-group-replication-group-name-option-is-mandatory’" class="headerlink" title="错误1 Plugin group_replication reported: ‘The group_replication_group_name option is mandatory’"></a>错误1 Plugin group_replication reported: ‘The group_replication_group_name option is mandatory’</h4><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">show</span> variables <span class="keyword">like</span> <span class="string">&#x27;group_replication_group_name&#x27;</span></span><br><span class="line"><span class="operator">+</span><span class="comment">------------------------------+-------+</span></span><br><span class="line"><span class="operator">|</span> Variable_name                <span class="operator">|</span> <span class="keyword">Value</span> <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">------------------------------+-------+</span></span><br><span class="line"><span class="operator">|</span> group_replication_group_name <span class="operator">|</span>       <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">------------------------------+-------+</span></span><br><span class="line"><span class="keyword">select</span> uuid(); <span class="comment">-- 获取uuid 并作为group_replication_group_name 的值</span></span><br><span class="line"><span class="keyword">set</span> persist group_replication_group_name<span class="operator">=</span><span class="string">&#x27;8332185e-9f15-11ee-8831-080027128c74&#x27;</span>;</span><br></pre></td></tr></table></figure>
+<h4 id="错误2-GCS-Invalid-hostname-or-IP-address-assigned-to-the-parameter-local-node-’"><a href="#错误2-GCS-Invalid-hostname-or-IP-address-assigned-to-the-parameter-local-node-’" class="headerlink" title="错误2 [GCS] Invalid hostname or IP address () assigned to the parameter local_node!’"></a>错误2 [GCS] Invalid hostname or IP address () assigned to the parameter local_node!’</h4><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">show</span> variables <span class="keyword">like</span> <span class="string">&#x27;group_replication_local_address&#x27;</span>;</span><br><span class="line"><span class="operator">+</span><span class="comment">---------------------------------+-------+</span></span><br><span class="line"><span class="operator">|</span> Variable_name                   <span class="operator">|</span> <span class="keyword">Value</span> <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">---------------------------------+-------+</span></span><br><span class="line"><span class="operator">|</span> group_replication_local_address <span class="operator">|</span>       <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">---------------------------------+-------+</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">set</span> persist group_replication_local_address<span class="operator">=</span>&quot;192.168.56.17:33061&quot;;</span><br><span class="line"></span><br><span class="line">root<span class="variable">@localhost</span>:(<span class="keyword">none</span>)<span class="operator">&gt;</span><span class="keyword">show</span> variables <span class="keyword">like</span> <span class="string">&#x27;group_replication_group_seeds&#x27;</span>;</span><br><span class="line"><span class="operator">+</span><span class="comment">-------------------------------+-------+</span></span><br><span class="line"><span class="operator">|</span> Variable_name                 <span class="operator">|</span> <span class="keyword">Value</span> <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">-------------------------------+-------+</span></span><br><span class="line"><span class="operator">|</span> group_replication_group_seeds <span class="operator">|</span>       <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">-------------------------------+-------+</span></span><br><span class="line"><span class="keyword">set</span> persist group_replication_group_seeds<span class="operator">=</span><span class="string">&#x27;db-56-17:33061,db-56-18:33061,db-56-19:33061&#x27;</span>;</span><br></pre></td></tr></table></figure>
+<h4 id="以上3个值为空，主要是设置组复制参数但没有写在-mysqldn-下。使用了mysqld-multi-启动不生效"><a href="#以上3个值为空，主要是设置组复制参数但没有写在-mysqldn-下。使用了mysqld-multi-启动不生效" class="headerlink" title="以上3个值为空，主要是设置组复制参数但没有写在[mysqldn] 下。使用了mysqld_multi 启动不生效"></a>以上3个值为空，主要是设置组复制参数但没有写在[mysqldn] 下。使用了mysqld_multi 启动不生效</h4><h4 id="错误-3-ERROR-MY-011526-Repl-Plugin-group-replication-reported-‘This-member-has-more-executed-transactions-than-those-present-in-the-group-Local-transactions-1bb739ac-9fc7-11ee-bc56-080027e817da-1-gt-Group-transactions-0ecaadea-9fc7-11ee-8099-080027128c74-1-8332185e-9f15-11ee-8831-080027128c74-1’"><a href="#错误-3-ERROR-MY-011526-Repl-Plugin-group-replication-reported-‘This-member-has-more-executed-transactions-than-those-present-in-the-group-Local-transactions-1bb739ac-9fc7-11ee-bc56-080027e817da-1-gt-Group-transactions-0ecaadea-9fc7-11ee-8099-080027128c74-1-8332185e-9f15-11ee-8831-080027128c74-1’" class="headerlink" title="错误 3[ERROR] [MY-011526] [Repl] Plugin group_replication reported: ‘This member has more executed transactions than those present in the group. Local transactions: 1bb739ac-9fc7-11ee-bc56-080027e817da:1 &gt; Group transactions: 0ecaadea-9fc7-11ee-8099-080027128c74:1, 8332185e-9f15-11ee-8831-080027128c74:1’"></a>错误 3[ERROR] [MY-011526] [Repl] Plugin group_replication reported: ‘This member has more executed transactions than those present in the group. Local transactions: 1bb739ac-9fc7-11ee-bc56-080027e817da:1 &gt; Group transactions: 0ecaadea-9fc7-11ee-8099-080027128c74:1, 8332185e-9f15-11ee-8831-080027128c74:1’</h4><h4 id="2023-12-21T06-18-37-133900Z-0-ERROR-MY-011522-Repl-Plugin-group-replication-reported-‘The-member-contains-transactions-not-present-in-the-group-The-member-will-now-exit-the-group-’"><a href="#2023-12-21T06-18-37-133900Z-0-ERROR-MY-011522-Repl-Plugin-group-replication-reported-‘The-member-contains-transactions-not-present-in-the-group-The-member-will-now-exit-the-group-’" class="headerlink" title="2023-12-21T06:18:37.133900Z 0 [ERROR] [MY-011522] [Repl] Plugin group_replication reported: ‘The member contains transactions not present in the group. The member will now exit the group.’"></a>2023-12-21T06:18:37.133900Z 0 [ERROR] [MY-011522] [Repl] Plugin group_replication reported: ‘The member contains transactions not present in the group. The member will now exit the group.’</h4><h4 id="这是因为我们启动的是新实例。并不是通过复制。拥有自己的gtid-。将主库信息置空。再启动复制"><a href="#这是因为我们启动的是新实例。并不是通过复制。拥有自己的gtid-。将主库信息置空。再启动复制" class="headerlink" title="这是因为我们启动的是新实例。并不是通过复制。拥有自己的gtid 。将主库信息置空。再启动复制"></a>这是因为我们启动的是新实例。并不是通过复制。拥有自己的gtid 。将主库信息置空。再启动复制</h4><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">reset master</span><br></pre></td></tr></table></figure>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/group-replication/" rel="tag"># group replication</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/11/29/flink/" rel="prev" title="flink 配置">
+      <i class="fa fa-chevron-left"></i> flink 配置
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2024/01/08/innodbCluster/" rel="next" title="利用 mysqlsh 搭建 innodb cluster">
+      利用 mysqlsh 搭建 innodb cluster <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%84%E5%A4%8D%E5%88%B6%E9%85%8D%E7%BD%AE%E7%9A%84%E7%9B%B8%E5%85%B3%E8%A6%81%E6%B1%82"><span class="nav-number">1.</span> <span class="nav-text">组复制配置的相关要求</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%84%E5%A4%8D%E5%88%B6%E7%9A%84%E9%99%90%E5%88%B6"><span class="nav-number">2.</span> <span class="nav-text">组复制的限制</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%89%E8%A3%85%E5%87%86%E5%A4%87"><span class="nav-number">3.</span> <span class="nav-text">安装准备</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%85%8D%E7%BD%AEssh"><span class="nav-number">4.</span> <span class="nav-text">配置ssh</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%85%88%E6%93%8D%E4%BD%9C-db-56-17"><span class="nav-number"></span> <span class="nav-text">先操作 db-56-17</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E5%8F%82%E6%95%B0"><span class="nav-number">1.</span> <span class="nav-text">配置参数</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BF%85%E8%A6%81%E5%8F%82%E6%95%B0%E9%85%8D%E7%BD%AE"><span class="nav-number">1.1.</span> <span class="nav-text">必要参数配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A4%8D%E5%88%B6%E6%A1%86%E6%9E%B6%E7%9B%B8%E5%85%B3"><span class="nav-number">1.2.</span> <span class="nav-text">复制框架相关</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BB%84%E5%A4%8D%E5%88%B6%E7%9B%B8%E5%85%B3%E5%8F%82%E6%95%B0"><span class="nav-number">1.3.</span> <span class="nav-text">组复制相关参数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B3%A8%E6%84%8F"><span class="nav-number">1.4.</span> <span class="nav-text">注意</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E7%BB%84%E5%A4%8D%E5%88%B6"><span class="nav-number">2.</span> <span class="nav-text">配置组复制</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%9D%E5%A7%8B%E5%8C%96%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AE%9E%E4%BE%8B"><span class="nav-number">2.1.</span> <span class="nav-text">初始化数据库实例</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%90%AF%E5%8A%A8%E6%95%B0%E6%8D%AE%E5%BA%93"><span class="nav-number">2.2.</span> <span class="nav-text">启动数据库</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9F%A5%E7%9C%8B%E7%BB%84%E5%A4%8D%E5%88%B6%E6%8F%92%E4%BB%B6%E6%98%AF%E5%90%A6%E5%B7%B2%E5%90%AF%E5%8A%A8%E3%80%82"><span class="nav-number">2.3.</span> <span class="nav-text">查看组复制插件是否已启动。</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A6%82%E6%9E%9C%E6%B2%A1%E6%9C%89%E5%90%AF%E5%8A%A8%E5%88%99%E5%AE%89%E8%A3%85%E7%BB%84%E5%A4%8D%E5%88%B6%E6%8F%92%E4%BB%B6"><span class="nav-number">2.4.</span> <span class="nav-text">如果没有启动则安装组复制插件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%9B%E5%BB%BA%E5%A4%8D%E5%88%B6%E8%B4%A6%E5%8F%B7"><span class="nav-number">2.5.</span> <span class="nav-text">创建复制账号</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%BE%E7%BD%AE%E7%BB%84%E5%A4%8D%E5%88%B6%E7%94%A8%E4%BA%8E%E5%88%86%E5%B8%83%E5%BC%8F%E6%81%A2%E5%A4%8D%E7%94%A8%E6%88%B7%E6%95%B0%E6%8D%AE%E7%9A%84%E5%87%AD%E8%AF%81%E4%B8%BA-group-replication-recovery"><span class="nav-number">2.6.</span> <span class="nav-text">设置组复制用于分布式恢复用户数据的凭证为 group_replication_recovery</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC%E4%B8%80%E4%B8%AA%E8%8A%82%E7%82%B9%E5%90%AF%E7%94%A8%E5%BC%95%E5%AF%BC%EF%BC%8C%E5%90%AF%E5%8A%A8%E7%BB%84%E5%A4%8D%E5%88%B6"><span class="nav-number">2.7.</span> <span class="nav-text">第一个节点启用引导，启动组复制</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9F%A5%E7%9C%8B%E7%BB%84%E6%88%90%E5%91%98"><span class="nav-number">2.8.</span> <span class="nav-text">查看组成员</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%93%8D%E4%BD%9C-db-56-18-%E4%BD%BF%E5%85%B6%E5%8A%A0%E5%85%A5%E7%BB%84"><span class="nav-number"></span> <span class="nav-text">操作 db-56-18 ,使其加入组</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E6%95%B0%E9%85%8D%E7%BD%AE%E3%80%82"><span class="nav-number">1.</span> <span class="nav-text">参数配置。</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B0%86-db-56-17-%E7%9A%84%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6%E5%A4%8D%E5%88%B6%E5%88%B0-db-56-18"><span class="nav-number">1.1.</span> <span class="nav-text">将 db-56-17 的配置文件复制到 db-56-18</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9C%A8-db-56-18-%E4%B8%8A%E4%BF%AE%E6%94%B9%E4%B8%8B%E9%9D%A22%E4%B8%AA%E5%8F%82%E6%95%B0%E7%9A%84%E5%80%BC"><span class="nav-number">1.2.</span> <span class="nav-text">在 db-56-18 上修改下面2个参数的值</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%9D%E5%A7%8B%E5%8C%96%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AE%9E%E4%BE%8B-1"><span class="nav-number">1.3.</span> <span class="nav-text">初始化数据库实例</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%90%AF%E5%8A%A8%E6%95%B0%E6%8D%AE%E5%BA%93-1"><span class="nav-number">1.4.</span> <span class="nav-text">启动数据库</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%A3%80%E6%9F%A5%E6%8F%92%E4%BB%B6%E5%B9%B6%E8%AE%BE%E7%BD%AE%E5%A4%8D%E5%88%B6%E8%B4%A6%E5%8F%B7"><span class="nav-number">1.5.</span> <span class="nav-text">检查插件并设置复制账号</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9B%A0%E4%B8%BA%E6%88%91%E4%BB%AC%E6%98%AF%E6%96%B0%E5%BC%80%E7%9A%84%E5%AE%9E%E4%BE%8B%E3%80%82%E5%9C%A8%E5%8A%A0%E5%85%A5%E5%A4%8D%E5%88%B6%E7%BB%84%E6%97%B6%E9%9C%80%E8%A6%81%E9%87%8D%E7%BD%AE%E6%8E%89%E6%9C%AC%E5%9C%B0%E7%9A%84gtid%E4%BF%A1%E6%81%AF"><span class="nav-number">1.6.</span> <span class="nav-text">因为我们是新开的实例。在加入复制组时需要重置掉本地的gtid信息</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%BE%E7%BD%AE%E7%BB%84%E5%A4%8D%E5%88%B6%E7%94%A8%E4%BA%8E%E5%88%86%E5%B8%83%E5%BC%8F%E6%81%A2%E5%A4%8D%E7%94%A8%E6%88%B7%E6%95%B0%E6%8D%AE%E7%9A%84%E5%87%AD%E8%AF%81%E4%B8%BA-group-replication-recovery-1"><span class="nav-number">1.7.</span> <span class="nav-text">设置组复制用于分布式恢复用户数据的凭证为 group_replication_recovery</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%90%AF%E5%8A%A8%E7%BB%84%E5%A4%8D%E5%88%B6-%E8%BF%99%E9%87%8C%E4%B8%8E%E8%8A%82%E7%82%B91%E6%9C%89%E6%89%80%E4%B8%8D%E5%90%8C%EF%BC%8C%E4%BB%85%E5%90%AF%E5%8A%A8%E7%BB%84%E5%A4%8D%E5%88%B6%EF%BC%8C%E4%B8%8D%E8%A6%81%E5%BC%80%E5%90%AF%E7%BB%84%E5%BC%95%E5%AF%BC"><span class="nav-number">1.8.</span> <span class="nav-text">启动组复制(这里与节点1有所不同，仅启动组复制，不要开启组引导)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9F%A5%E7%9C%8B%E7%BB%84%E6%88%90%E5%91%98-1"><span class="nav-number">1.9.</span> <span class="nav-text">查看组成员</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%93%8D%E4%BD%9C-db-56-19-%E4%BD%BF%E5%85%B6%E5%8A%A0%E5%85%A5%E7%BB%84"><span class="nav-number"></span> <span class="nav-text">操作 db-56-19 ,使其加入组</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E6%95%B0%E9%85%8D%E7%BD%AE%E3%80%82-1"><span class="nav-number">1.</span> <span class="nav-text">参数配置。</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B0%86-db-56-17-%E7%9A%84%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6%E5%A4%8D%E5%88%B6%E5%88%B0-db-56-19"><span class="nav-number">1.1.</span> <span class="nav-text">将 db-56-17 的配置文件复制到 db-56-19</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9C%A8-db-56-19-%E4%B8%8A%E4%BF%AE%E6%94%B9%E4%B8%8B%E9%9D%A22%E4%B8%AA%E5%8F%82%E6%95%B0%E7%9A%84%E5%80%BC"><span class="nav-number">1.2.</span> <span class="nav-text">在 db-56-19 上修改下面2个参数的值</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%9D%E5%A7%8B%E5%8C%96%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AE%9E%E4%BE%8B-2"><span class="nav-number">1.3.</span> <span class="nav-text">初始化数据库实例</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%90%AF%E5%8A%A8%E6%95%B0%E6%8D%AE%E5%BA%93-2"><span class="nav-number">1.4.</span> <span class="nav-text">启动数据库</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%A3%80%E6%9F%A5%E6%8F%92%E4%BB%B6%E5%B9%B6%E8%AE%BE%E7%BD%AE%E5%A4%8D%E5%88%B6%E8%B4%A6%E5%8F%B7-1"><span class="nav-number">1.5.</span> <span class="nav-text">检查插件并设置复制账号</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9B%A0%E4%B8%BA%E6%88%91%E4%BB%AC%E6%98%AF%E6%96%B0%E5%BC%80%E7%9A%84%E5%AE%9E%E4%BE%8B%E3%80%82%E5%9C%A8%E5%8A%A0%E5%85%A5%E5%A4%8D%E5%88%B6%E7%BB%84%E6%97%B6%E9%9C%80%E8%A6%81%E9%87%8D%E7%BD%AE%E6%8E%89%E6%9C%AC%E5%9C%B0%E7%9A%84gtid%E4%BF%A1%E6%81%AF-1"><span class="nav-number">1.6.</span> <span class="nav-text">因为我们是新开的实例。在加入复制组时需要重置掉本地的gtid信息</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%BE%E7%BD%AE%E7%BB%84%E5%A4%8D%E5%88%B6%E7%94%A8%E4%BA%8E%E5%88%86%E5%B8%83%E5%BC%8F%E6%81%A2%E5%A4%8D%E7%94%A8%E6%88%B7%E6%95%B0%E6%8D%AE%E7%9A%84%E5%87%AD%E8%AF%81%E4%B8%BA-group-replication-recovery-2"><span class="nav-number">1.7.</span> <span class="nav-text">设置组复制用于分布式恢复用户数据的凭证为 group_replication_recovery</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%90%AF%E5%8A%A8%E7%BB%84%E5%A4%8D%E5%88%B6-%E8%BF%99%E9%87%8C%E4%B8%8E%E8%8A%82%E7%82%B91%E6%9C%89%E6%89%80%E4%B8%8D%E5%90%8C%EF%BC%8C%E4%BB%85%E5%90%AF%E5%8A%A8%E7%BB%84%E5%A4%8D%E5%88%B6%EF%BC%8C%E4%B8%8D%E8%A6%81%E5%BC%80%E5%90%AF%E7%BB%84%E5%BC%95%E5%AF%BC-1"><span class="nav-number">1.8.</span> <span class="nav-text">启动组复制(这里与节点1有所不同，仅启动组复制，不要开启组引导)</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E6%B5%8B%E8%AF%95"><span class="nav-number">2.</span> <span class="nav-text">数据测试</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%87%BA%E7%8E%B0%E9%94%99%E8%AF%AF%E5%8F%8A%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88"><span class="nav-number">3.</span> <span class="nav-text">出现错误及解决方案</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%94%99%E8%AF%AF1-Plugin-group-replication-reported-%E2%80%98The-group-replication-group-name-option-is-mandatory%E2%80%99"><span class="nav-number">3.0.1.</span> <span class="nav-text">错误1 Plugin group_replication reported: ‘The group_replication_group_name option is mandatory’</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%94%99%E8%AF%AF2-GCS-Invalid-hostname-or-IP-address-assigned-to-the-parameter-local-node-%E2%80%99"><span class="nav-number">3.0.2.</span> <span class="nav-text">错误2 [GCS] Invalid hostname or IP address () assigned to the parameter local_node!’</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%BB%A5%E4%B8%8A3%E4%B8%AA%E5%80%BC%E4%B8%BA%E7%A9%BA%EF%BC%8C%E4%B8%BB%E8%A6%81%E6%98%AF%E8%AE%BE%E7%BD%AE%E7%BB%84%E5%A4%8D%E5%88%B6%E5%8F%82%E6%95%B0%E4%BD%86%E6%B2%A1%E6%9C%89%E5%86%99%E5%9C%A8-mysqldn-%E4%B8%8B%E3%80%82%E4%BD%BF%E7%94%A8%E4%BA%86mysqld-multi-%E5%90%AF%E5%8A%A8%E4%B8%8D%E7%94%9F%E6%95%88"><span class="nav-number">3.0.3.</span> <span class="nav-text">以上3个值为空，主要是设置组复制参数但没有写在[mysqldn] 下。使用了mysqld_multi 启动不生效</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%94%99%E8%AF%AF-3-ERROR-MY-011526-Repl-Plugin-group-replication-reported-%E2%80%98This-member-has-more-executed-transactions-than-those-present-in-the-group-Local-transactions-1bb739ac-9fc7-11ee-bc56-080027e817da-1-gt-Group-transactions-0ecaadea-9fc7-11ee-8099-080027128c74-1-8332185e-9f15-11ee-8831-080027128c74-1%E2%80%99"><span class="nav-number">3.0.4.</span> <span class="nav-text">错误 3[ERROR] [MY-011526] [Repl] Plugin group_replication reported: ‘This member has more executed transactions than those present in the group. Local transactions: 1bb739ac-9fc7-11ee-bc56-080027e817da:1 &gt; Group transactions: 0ecaadea-9fc7-11ee-8099-080027128c74:1, 8332185e-9f15-11ee-8831-080027128c74:1’</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2023-12-21T06-18-37-133900Z-0-ERROR-MY-011522-Repl-Plugin-group-replication-reported-%E2%80%98The-member-contains-transactions-not-present-in-the-group-The-member-will-now-exit-the-group-%E2%80%99"><span class="nav-number">3.0.5.</span> <span class="nav-text">2023-12-21T06:18:37.133900Z 0 [ERROR] [MY-011522] [Repl] Plugin group_replication reported: ‘The member contains transactions not present in the group. The member will now exit the group.’</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%BF%99%E6%98%AF%E5%9B%A0%E4%B8%BA%E6%88%91%E4%BB%AC%E5%90%AF%E5%8A%A8%E7%9A%84%E6%98%AF%E6%96%B0%E5%AE%9E%E4%BE%8B%E3%80%82%E5%B9%B6%E4%B8%8D%E6%98%AF%E9%80%9A%E8%BF%87%E5%A4%8D%E5%88%B6%E3%80%82%E6%8B%A5%E6%9C%89%E8%87%AA%E5%B7%B1%E7%9A%84gtid-%E3%80%82%E5%B0%86%E4%B8%BB%E5%BA%93%E4%BF%A1%E6%81%AF%E7%BD%AE%E7%A9%BA%E3%80%82%E5%86%8D%E5%90%AF%E5%8A%A8%E5%A4%8D%E5%88%B6"><span class="nav-number">3.0.6.</span> <span class="nav-text">这是因为我们启动的是新实例。并不是通过复制。拥有自己的gtid 。将主库信息置空。再启动复制</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Sheen</p>
+  <div class="site-description" itemprop="description">数据库相关技术研究,自动化运维</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">61</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">12</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">76</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2024</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Sheen</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/pjax/pjax.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[data-pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.dataset.pjax !== undefined) {
+      script.dataset.pjax = '';
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '78f8e6427a00d33b1454',
+      clientSecret: 'df55248398c379200efd40824ecae2d9fd208e20',
+      repo        : 'sheenzxx.github.io',
+      owner       : 'sheenzxx',
+      admin       : ['sheenzxx'],
+      id          : '4dea9e6e911b6d1261aec6d55e105908',
+        language: 'zh-CN',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+    </div>
+</body>
+</html>

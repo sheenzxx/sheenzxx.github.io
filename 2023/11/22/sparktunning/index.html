@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"sheenzxx.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"gitalk","storage":true,"lazyload":false,"nav":null,"activeClass":"gitalk"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="硬件资源类1. 与 CPU 相关配置12345spark.cores.max               在standalone模式下一个应用程序能使用最多的cpu数,如果没有设置，将用 spark.deploy.defaultCores 的值替代。spark.executor.cores          单个executor内CPU核数。在standalone模式下 默认使用节点上所有CPU.">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Spark 性能调优配置">
+<meta property="og:url" content="https://sheenzxx.github.io/2023/11/22/sparktunning/index.html">
+<meta property="og:site_name" content="sheen&#39;s Blog">
+<meta property="og:description" content="硬件资源类1. 与 CPU 相关配置12345spark.cores.max               在standalone模式下一个应用程序能使用最多的cpu数,如果没有设置，将用 spark.deploy.defaultCores 的值替代。spark.executor.cores          单个executor内CPU核数。在standalone模式下 默认使用节点上所有CPU.">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2023-11-22T05:57:17.000Z">
+<meta property="article:modified_time" content="2023-11-24T07:44:04.243Z">
+<meta property="article:author" content="Sheen">
+<meta property="article:tag" content="spark">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://sheenzxx.github.io/2023/11/22/sparktunning/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Spark 性能调优配置 | sheen's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="sheen's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">sheen's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">随笔，技术笔记</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/home/" rel="section"><i class="home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://sheenzxx.github.io/2023/11/22/sparktunning/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Sheen">
+      <meta itemprop="description" content="数据库相关技术研究,自动化运维">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="sheen's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Spark 性能调优配置
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2023-11-22 13:57:17" itemprop="dateCreated datePublished" datetime="2023-11-22T13:57:17+08:00">2023-11-22</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2023-11-24 15:44:04" itemprop="dateModified" datetime="2023-11-24T15:44:04+08:00">2023-11-24</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/hadoop/" itemprop="url" rel="index"><span itemprop="name">hadoop</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="硬件资源类"><a href="#硬件资源类" class="headerlink" title="硬件资源类"></a>硬件资源类</h2><h4 id="1-与-CPU-相关配置"><a href="#1-与-CPU-相关配置" class="headerlink" title="1. 与 CPU 相关配置"></a>1. 与 CPU 相关配置</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">spark.cores.max               在standalone模式下一个应用程序能使用最多的cpu数,如果没有设置，将用 spark.deploy.defaultCores 的值替代。</span><br><span class="line">spark.executor.cores          单个executor内CPU核数。在standalone模式下 默认使用节点上所有CPU.YARN模式下默认为1</span><br><span class="line">spark.task.cpus               单个任务消耗的CPU核数</span><br><span class="line">spark.default.parallelism     未指定分区数时的默认并行度</span><br><span class="line">spark.sql.shuffle.partitions  数据关联、聚合操作中 reducer 端的分区数（并行度）   </span><br></pre></td></tr></table></figure>
+<p>RDD (Resiliennt Distributed Datasets) 抽象弹性分布式数据集<br>并行度（Parallelism）与并行计算任务（Paralleled Tasks）的区别？</p>
+<p>并行度指的是分布式数据集被划分为多少份，从而用于分布式计算。并行度的出发点是数据，它明确了数据划分的粒度。并行度越高，数据的粒度越细，数据分片越多，数据越分散。由此可见，像分区数量、分片数量、Partitions 这些概念都是并行度的同义词。</p>
+<p>并行计算任务指的是在任一时刻整个集群能够同时计算的任务数量。换句话说，它的出发点是计算任务、是 CPU，由与 CPU 有关的三个参数共同决定。</p>
+<p>Executor中并行计算任务数的上限是 #Executor-tasks=spark.executor.cores ÷spark.task.cpus ，<br>整个集群并行计算任务数是 #Executors= #Executor-tasks <em> 集群内 Executors 的数量<br>最终的数值是：#Executor-tasks </em> #Executors。<br>并行度决定了数据粒度，数据粒度决定了分区大小，分区大小则决定着每个计算任务的内存消耗</p>
+<h4 id="2-与内存相关配置项"><a href="#2-与内存相关配置项" class="headerlink" title="2. 与内存相关配置项"></a>2. 与内存相关配置项</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">spark.executor.memory          单个Executor堆内内存总大小</span><br><span class="line">spark.memory.offHeap.size      单个Executor堆外内存总大小</span><br><span class="line">spark.memory.fraction          用于缓存RDD和执行计算的内存比例</span><br><span class="line">spark.memory.storageFraction   </span><br><span class="line">spark.rdd.compress             RDD缓存是否压缩，默认不压缩</span><br></pre></td></tr></table></figure>
+<h4 id="3-磁盘相关配置项"><a href="#3-磁盘相关配置项" class="headerlink" title="3. 磁盘相关配置项"></a>3. 磁盘相关配置项</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">spark.local.dir    用于缓存RDD和shuffle中间文件磁盘目录</span><br></pre></td></tr></table></figure>
+<h2 id="Shuffle类配置项"><a href="#Shuffle类配置项" class="headerlink" title="Shuffle类配置项"></a>Shuffle类配置项</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">spark.shuffle.file.buffer=32k	           Map输出端写入缓冲区大小</span><br><span class="line">spark.reducer.maxSizeInFlight=48m	       Reduce输入端的读取缓冲区大小</span><br><span class="line">spark.shuffle.io.maxRetries=3	</span><br><span class="line">spark.shuffle.io.retryWait=5s	</span><br><span class="line">spark.shuffle.memoryFraction=0.2	</span><br><span class="line">spark.shuffle.manager=sort	</span><br><span class="line">spark.shuffle.sort.bypassMergeThreshold	    Map阶段不进行排序的分区阈值</span><br><span class="line">spark.shuffle.consolidateFiles=false	</span><br></pre></td></tr></table></figure>
+<h2 id="Spark-SQL类配置项"><a href="#Spark-SQL类配置项" class="headerlink" title="Spark SQL类配置项"></a>Spark SQL类配置项</h2><p>AQE（Adaptive query execution，自适应查询引擎）三大特性：</p>
+<p>自动分区合并<br>自动数据倾斜处理<br>Join策略调整</p>
+<h4 id="与自动分区合并有关配置项"><a href="#与自动分区合并有关配置项" class="headerlink" title="与自动分区合并有关配置项"></a>与自动分区合并有关配置项</h4><p>（1）分区合并的场景：在 Shuffle 过程中，因为数据分布不均衡，导致 Reduce 阶段存在大量的小分区，这些小分区的数据量非常小，调度成本很高。<br>（2）AQE如何判断分区是否需要合并？AQE 事先并不判断哪些分区足够小，而是按照分区编号进行扫描，当扫描量超过“目标尺寸”时，就合并一次。<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">spark.sql.adaptive.enabled	                                是否启动AQE，默认禁用</span><br><span class="line">spark.sql.adaptive.advisoryPartitionSizeInBytes	            开发者指定分区合并后的推荐尺寸</span><br><span class="line">spark.sql.adaptive.coalescePartitions.minPartitionNum=200	分区合并后数据集的分区数不能低于该值</span><br></pre></td></tr></table></figure><br>假设Shuffle 过后数据大小为 20GB，minPartitionNum 设置为 200，每个分区的尺寸就是 20GB / 200 = 100MB。再假设，advisoryPartitionSizeInBytes 设置为 200MB，最终的目标分区尺寸就是取（100MB，200MB）之间的最小值，也就是 100MB</p>
+<h4 id="与自动数据倾斜有关配置项"><a href="#与自动数据倾斜有关配置项" class="headerlink" title="与自动数据倾斜有关配置项"></a>与自动数据倾斜有关配置项</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">spark.sql.adaptive.skewJoin.enabled	                         是否开启AQE中自动处理数据倾斜的功能</span><br><span class="line">spark.sql.adaptive.skewJoin.skewedPartitionFactor	         判定数据分区是否倾斜的比例数</span><br><span class="line">spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes	 判定数据分区是否倾斜的最低阈值</span><br><span class="line">spark.sql.adaptive.advisoryPartitionSizeInBytes	             以字节为单位，拆分倾斜分区的数据粒度</span><br></pre></td></tr></table></figure>
+<p>假设数据表A有3个分区，分区大小分别是80MB、100MB和 512MB。这些分区按大小个排序后的中位数是100MB<br>skewedPartitionFactor 的默认值是5倍，所以大于100MB * 5 = 500MB 的分区才有可能被判定为倾斜分区<br>skewedPartitionThresholdInBytes的默认值是256MB，满足中位数条件的分区，必须要大于 256MB，Saprk才会把这个分区最终判定为倾斜分区<br>advisoryPartitionSizeInBytes的默认值是256MB，512MB的倾斜分区会以 256MB 为粒度拆分成多份，因此，这个大分区会被拆成 2 个小分区（ 512MB / 256MB =2）<br>拆分之后，原来的数据表就由 3 个分区变成了 4 个分区，每个分区的尺寸都不大于 256MB。</p>
+<h4 id="与Join策略调整有关配置项"><a href="#与Join策略调整有关配置项" class="headerlink" title="与Join策略调整有关配置项"></a>与Join策略调整有关配置项</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">spark.sql.autoBroadcastJoinThreshold=10M	                    两表join,一张表的尺寸小于 10MB，二者的关联操作就可以降级为 Broadcast Join(2G推荐)</span><br><span class="line">spark.sql.adaptive.nonEmptyPartitionRatioForBroadcastJoin=0.2	非空的数据分区占比要小于 0.2，才能成功触发 Broadcast Join 降级</span><br></pre></td></tr></table></figure>
+<p>假设，大表过滤之前有 100 个分区，Filter 操作之后，有 85 个分区内的数据因为不满足过滤条件，在过滤之后都变成了没有任何数据的空分区，另外的 15 个分区还保留着满足过滤条件的数据。</p>
+<p>这张大表过滤之后的非空分区占比是 15 / 100 = 15%，因为 15% 小于 0.2，所以这个例子中的大表会成功触发 Broadcast Join 降级。相反，如果大表过滤之后，非空分区占比大于 0.2，那么剩余数据量再小，AQE 也不会把 Shuffle Joins 降级为 Broadcast Join。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/spark/" rel="tag"># spark</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/11/06/clickhouseRepairReplica/" rel="prev" title="clickhouse重建副本操作">
+      <i class="fa fa-chevron-left"></i> clickhouse重建副本操作
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/11/24/requestproxy/" rel="next" title="python 使用代理访问">
+      python 使用代理访问 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%A1%AC%E4%BB%B6%E8%B5%84%E6%BA%90%E7%B1%BB"><span class="nav-number">1.</span> <span class="nav-text">硬件资源类</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#1-%E4%B8%8E-CPU-%E7%9B%B8%E5%85%B3%E9%85%8D%E7%BD%AE"><span class="nav-number">1.0.1.</span> <span class="nav-text">1. 与 CPU 相关配置</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-%E4%B8%8E%E5%86%85%E5%AD%98%E7%9B%B8%E5%85%B3%E9%85%8D%E7%BD%AE%E9%A1%B9"><span class="nav-number">1.0.2.</span> <span class="nav-text">2. 与内存相关配置项</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-%E7%A3%81%E7%9B%98%E7%9B%B8%E5%85%B3%E9%85%8D%E7%BD%AE%E9%A1%B9"><span class="nav-number">1.0.3.</span> <span class="nav-text">3. 磁盘相关配置项</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Shuffle%E7%B1%BB%E9%85%8D%E7%BD%AE%E9%A1%B9"><span class="nav-number">2.</span> <span class="nav-text">Shuffle类配置项</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Spark-SQL%E7%B1%BB%E9%85%8D%E7%BD%AE%E9%A1%B9"><span class="nav-number">3.</span> <span class="nav-text">Spark SQL类配置项</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%8E%E8%87%AA%E5%8A%A8%E5%88%86%E5%8C%BA%E5%90%88%E5%B9%B6%E6%9C%89%E5%85%B3%E9%85%8D%E7%BD%AE%E9%A1%B9"><span class="nav-number">3.0.1.</span> <span class="nav-text">与自动分区合并有关配置项</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%8E%E8%87%AA%E5%8A%A8%E6%95%B0%E6%8D%AE%E5%80%BE%E6%96%9C%E6%9C%89%E5%85%B3%E9%85%8D%E7%BD%AE%E9%A1%B9"><span class="nav-number">3.0.2.</span> <span class="nav-text">与自动数据倾斜有关配置项</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%8EJoin%E7%AD%96%E7%95%A5%E8%B0%83%E6%95%B4%E6%9C%89%E5%85%B3%E9%85%8D%E7%BD%AE%E9%A1%B9"><span class="nav-number">3.0.3.</span> <span class="nav-text">与Join策略调整有关配置项</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Sheen</p>
+  <div class="site-description" itemprop="description">数据库相关技术研究,自动化运维</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">61</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">12</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">76</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2024</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Sheen</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/pjax/pjax.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[data-pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.dataset.pjax !== undefined) {
+      script.dataset.pjax = '';
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '78f8e6427a00d33b1454',
+      clientSecret: 'df55248398c379200efd40824ecae2d9fd208e20',
+      repo        : 'sheenzxx.github.io',
+      owner       : 'sheenzxx',
+      admin       : ['sheenzxx'],
+      id          : '399f5c70759f3202b14c209ab6f6411e',
+        language: 'zh-CN',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+    </div>
+</body>
+</html>

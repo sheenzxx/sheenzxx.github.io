@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"sheenzxx.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"gitalk","storage":true,"lazyload":false,"nav":null,"activeClass":"gitalk"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="mysql 8.1 开始有了克隆插件 clone.so 。clone 是奔着组复制集群而去的，同时对于搭建主从也提供了极大便利。还不锁库锁表。瞬间觉得xtrabackup 不香了 安装:方法1：在my.cnf中添加参数，并重启plugin_load_add&#x3D;mysql_clone.so 方法2：在运行时安装插件使用INSTALL PLUGIN clone SONAME ‘mysql_clone.s">
+<meta property="og:type" content="article">
+<meta property="og:title" content="mysql的克隆插件">
+<meta property="og:url" content="https://sheenzxx.github.io/2024/01/08/mysqlcloneplugin/index.html">
+<meta property="og:site_name" content="sheen&#39;s Blog">
+<meta property="og:description" content="mysql 8.1 开始有了克隆插件 clone.so 。clone 是奔着组复制集群而去的，同时对于搭建主从也提供了极大便利。还不锁库锁表。瞬间觉得xtrabackup 不香了 安装:方法1：在my.cnf中添加参数，并重启plugin_load_add&#x3D;mysql_clone.so 方法2：在运行时安装插件使用INSTALL PLUGIN clone SONAME ‘mysql_clone.s">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2024-01-08T07:43:10.000Z">
+<meta property="article:modified_time" content="2024-01-08T08:20:51.450Z">
+<meta property="article:author" content="Sheen">
+<meta property="article:tag" content="plugin">
+<meta property="article:tag" content="clone">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://sheenzxx.github.io/2024/01/08/mysqlcloneplugin/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>mysql的克隆插件 | sheen's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="sheen's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">sheen's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">随笔，技术笔记</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/home/" rel="section"><i class="home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://sheenzxx.github.io/2024/01/08/mysqlcloneplugin/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Sheen">
+      <meta itemprop="description" content="数据库相关技术研究,自动化运维">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="sheen's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          mysql的克隆插件
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2024-01-08 15:43:10 / 修改时间：16:20:51" itemprop="dateCreated datePublished" datetime="2024-01-08T15:43:10+08:00">2024-01-08</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/mysql/" itemprop="url" rel="index"><span itemprop="name">mysql</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>mysql 8.1 开始有了克隆插件 clone.so 。clone 是奔着组复制集群而去的，同时对于搭建主从也提供了极大便利。还不锁库锁表。瞬间觉得xtrabackup 不香了</p>
+<h2 id="安装"><a href="#安装" class="headerlink" title="安装:"></a>安装:</h2><p>方法1：在my.cnf中添加参数，并重启<br>plugin_load_add=mysql_clone.so</p>
+<p>方法2：在运行时安装插件使用<br>INSTALL PLUGIN clone SONAME ‘mysql_clone.so’;</p>
+<p>如果要限定数据库启动时启动克隆插件并且不允许其在运行时删除<br>[mysqld]<br>plugin-load-add=mysql_clone.so<br>clone=FORCE_PLUS_PERMANENT</p>
+<h2 id="克隆数据到本地目录"><a href="#克隆数据到本地目录" class="headerlink" title="克隆数据到本地目录"></a>克隆数据到本地目录</h2><p>用户需要 BACKUP_ADMIN  权限<br>GRANT BACKUP_ADMIN ON <em>.</em> TO ‘clone_user’;<br>克隆本实例到 data_sheen_clone。<br>root@localhost:(none)&gt;CLONE LOCAL DATA DIRECTORY ‘/usr/local/mysql/data_sheen_clone’;<br>Query OK, 0 rows affected (2.70 sec)<br>注意<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">1. 路径以及目标目录必须是全路径</span><br><span class="line">2. 路径必须是已存在的路径</span><br><span class="line">3. 目标目录必须不存在</span><br><span class="line">4. 本地克隆不能克隆那些用户自建在 data 目录以外的表和表空间。</span><br></pre></td></tr></table></figure><br>拷贝完我们可以在指定目录下看到刚才克隆的数据库</p>
+<h2 id="克隆远端数据库"><a href="#克隆远端数据库" class="headerlink" title="克隆远端数据库"></a>克隆远端数据库</h2><p>CLONE INSTANCE FROM ‘user’@’host’:port<br>IDENTIFIED BY ‘password’<br>[DATA DIRECTORY [=] ‘clone_dir’]<br>[REQUIRE [NO] SSL];</p>
+<p>user 为源端实例的具有克隆权限的用户<br>password 为源端实例的具有克隆权限的用户的密码<br>host   为源端实例的地址，不支持IPV6地址<br>port   为源端实例的端口，不支持mysqlx_port<br>DATA DIRECTORY [=] ‘clone_dir’ 可选选项，指定接收方接收数据文件的目录。也需要绝对路径。目标目录不存在，并且用户具有该路径的权限。<br>       如果不指定，将会把当前实例的数据文件，binglog等全部删掉。然后克隆远端数据文件到该目录下。拷贝完成后重启数据库。<br>       默认情况下，接收端会将数据文件拷贝到 innodb_data_home_dir ， innodb_data_file_path, innodb_log_group_home_dir,  innodb_undo_directory目录中<br>       如果指定则将数据文件拷贝到指定目录<br>REQUIRE [NO] SSL 指定是否加密连接。默认启用加密行为</p>
+<h4 id="要求"><a href="#要求" class="headerlink" title="要求:"></a>要求:</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">1. 源端用户需要有 BACKUP_ADMIN 的权限</span><br><span class="line">2. 接收端用户需要有 CLONE_ADMIN （CLONE_ADMIN 包含了 BACKUP_ADMIN ,SHUTDOWN 的权限）</span><br><span class="line">3. 源端与接收端必须运行在相同的操作系统跟平台上</span><br><span class="line">4. 接收端接收数据文件的目录必须有足够的磁盘存储空间可以容纳下源端数据库的大小</span><br><span class="line">5. 如果有存在于数据目录以外的自建表空间。clone 操作必须有权限可以访问那些目录，查看所有的innodb 文件 SELECT FILE_NAME FROM INFORMATION_SCHEMA.FILES;</span><br><span class="line">6. 源端与接收端必须设定相同的character set 和 collation</span><br><span class="line">7. 源端与接收端必须设定相同的innodb_page_size 和 innodb_data_file_path。 SHOW VARIABLES LIKE &#x27;innodb_page_size&#x27;;  SHOW VARIABLES LIKE &#x27;innodb_data_file_path&#x27;;</span><br><span class="line">8. 如果克隆加密或者压缩页的数据。则源端与接收端必须系统文件块大小一致</span><br><span class="line">9. 将源端地址设置到 clone_valid_donor_list 中。SHOW VARIABLES LIKE &#x27;clone_valid_donor_list&#x27;;</span><br><span class="line">10. 执行时不能有其他克隆操作同时进行</span><br><span class="line">11. 接收端 max_allowed_packet 设置的值必须大于等于源端的max_allowed_packet设置的值。SHOW VARIABLES LIKE &#x27;max_allowed_packet&#x27;;</span><br><span class="line">12. 源端undo表空间里的文件名必须唯一。否则在拷贝到接收端的innodb_undo_directory 或者 clone_dir 的时候会因为名字重复而报错。</span><br><span class="line">    SELECT TABLESPACE_NAME, FILE_NAME FROM INFORMATION_SCHEMA.FILES</span><br><span class="line">       WHERE FILE_TYPE LIKE &#x27;UNDO LOG&#x27;;</span><br></pre></td></tr></table></figure>
+<h4 id="操作过程"><a href="#操作过程" class="headerlink" title="操作过程"></a>操作过程</h4><p>1) 在源端创建克隆账号，并授权<br>create user ‘repl’@’%’ identified by ‘repl’;<br>grant backup_admin ON <em>.</em> to ‘repl’@’%’;</p>
+<p>2) 在源端安装mysql_clone.so 插件<br>INSTALL PLUGIN clone SONAME ‘mysql_clone.so’;<br>或者<br>启动前添加 plugin_load_add = “mysql_clone.so”</p>
+<p>3) 在接收端创建复制账号<br>create user ‘repl’@’%’ identified by ‘repl’;<br>grant clone_admin ON <em>.</em> to ‘repl’@’%’;</p>
+<p>4) 在接收端安装mysql_clone.so 插件<br>INSTALL PLUGIN clone SONAME ‘mysql_clone.so’;<br>或者<br>启动前添加 plugin_load_add = “mysql_clone.so”</p>
+<p>这里可以直接用root 来操作</p>
+<p>5) 接收端设置 clone_valid_donor_list<br> SET GLOBAL clone_valid_donor_list = ‘192.168.56.17:3306’;</p>
+<p>6) 克隆目标端<br>root@localhost:(none)&gt;CLONE INSTANCE FROM ‘repl’@’192.168.56.17’:3306<br>  identified by ‘repl’<br>   REQUIRE no ssl;<br>从日志中可以看到拷贝完成后实例进行了重启<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">2023-12-25T07:54:53.799895Z 10 [Warning] [MY-013460] [InnoDB] Clone removing all user data for provisioning: Started</span><br><span class="line">2023-12-25T07:54:54.103700Z 10 [Warning] [MY-013460] [InnoDB] Clone removing all user data for provisioning: Finished</span><br><span class="line">2023-12-25T07:54:58.822308Z 0 [Warning] [MY-010909] [Server] /usr/local/mysql/bin/mysqld: Forcing close of thread 10  user: &#x27;root&#x27;.</span><br><span class="line">2023-12-25T07:54:59.689871Z 0 [System] [MY-010910] [Server] /usr/local/mysql/bin/mysqld: Shutdown complete (mysqld 8.2.0)  MySQL Community Server - GPL.</span><br><span class="line">2023-12-25T07:54:59.690938Z 0 [System] [MY-015016] [Server] MySQL Server - end.</span><br><span class="line">2023-12-25T07:54:59.912281Z mysqld_safe Number of processes running now: 0</span><br><span class="line">2023-12-25T07:54:59.919126Z mysqld_safe mysqld restarted</span><br><span class="line">2023-12-25T07:54:59.934787Z 0 [System] [MY-015015] [Server] MySQL Server - start.</span><br><span class="line">2023-12-25T07:55:00.277772Z 0 [Warning] [MY-011070] [Server] &#x27;binlog_format&#x27; is deprec</span><br></pre></td></tr></table></figure></p>
+<h4 id="克隆并行DDL"><a href="#克隆并行DDL" class="headerlink" title="克隆并行DDL"></a>克隆并行DDL</h4><p>在8.2 版本开始支持 克隆时并发执行DDL。由参数 clone_block_ddl 控制。默认开启<br>SET GLOBAL clone_block_ddl={OFF|ON}<br>克隆过程中不支持以下DDL行为并行运行<br>ALTER TABLE tbl_name DISCARD TABLESPACE;<br>ALTER TABLE tbl_name IMPORT TABLESPACE;<br>ALTER INSTANCE DISABLE INNODB REDO_LOG;</p>
+<h4 id="克隆用于复制"><a href="#克隆用于复制" class="headerlink" title="克隆用于复制"></a>克隆用于复制</h4><p>查看接收端的binlog 位置。<br>SELECT BINLOG_FILE, BINLOG_POSITION FROM performance_schema.clone_status;</p>
+<p>查看接收端GTID 信息<br>SELECT @@GLOBAL.GTID_EXECUTED;</p>
+<ol>
+<li>如果是用于组复制添加成员。执行<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">START GROUP_REPLICATION </span><br></pre></td></tr></table></figure></li>
+<li>如果用于做主从复制的从库，则可以源端为主库或从库。<br>GTID 模式：<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">CHANGE SOURCE TO SOURCE_HOST = &#x27;source_host_name&#x27;, SOURCE_PORT = source_port_num,</span><br><span class="line">       ...</span><br><span class="line">       SOURCE_AUTO_POSITION = 1,</span><br><span class="line">       FOR CHANNEL &#x27;setup_channel&#x27;;</span><br><span class="line">START REPLICA USER = &#x27;user_name&#x27; PASSWORD = &#x27;password&#x27; FOR CHANNEL &#x27;setup_channel&#x27;;</span><br></pre></td></tr></table></figure></li>
+<li>基于bin-log 位置的复制<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">SELECT BINLOG_FILE, BINLOG_POSITION FROM performance_schema.clone_status;</span><br><span class="line">CHANGE SOURCE TO SOURCE_HOST = &#x27;source_host_name&#x27;, SOURCE_PORT = source_port_num,</span><br><span class="line">       ...</span><br><span class="line">       SOURCE_LOG_FILE = &#x27;source_log_name&#x27;,</span><br><span class="line">       SOURCE_LOG_POS = source_log_pos,</span><br><span class="line">       FOR CHANNEL &#x27;setup_channel&#x27;;</span><br><span class="line">START REPLICA USER = &#x27;user_name&#x27; PASSWORD = &#x27;password&#x27; FOR CHANNEL &#x27;setup_channel&#x27;;</span><br></pre></td></tr></table></figure>
+</li>
+</ol>
+<h4 id="克隆过程中产生的目录"><a href="#克隆过程中产生的目录" class="headerlink" title="克隆过程中产生的目录"></a>克隆过程中产生的目录</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">#clone: 克隆操作过程中内部产生的文件存放在这个目录下</span><br><span class="line">#ib_archive：存储克隆过程中源端的归档日志的文件</span><br><span class="line">.#clone：接收端当本地文件被删除并拷贝远端文件过程中产生的临时文件</span><br></pre></td></tr></table></figure>
+<h4 id="监控克隆过程"><a href="#监控克隆过程" class="headerlink" title="监控克隆过程"></a>监控克隆过程</h4><ol>
+<li><p>查看克隆的状态<br>SELECT STATE FROM performance_schema.clone_status;<br>4种状态<br>Not Started, In Progress, Completed, Failed</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"> root<span class="variable">@localhost</span>:(<span class="keyword">none</span>)<span class="operator">&gt;</span><span class="keyword">select</span> <span class="operator">*</span> <span class="keyword">from</span> performance_schema.clone_status; </span><br><span class="line"><span class="operator">+</span><span class="comment">------+------+-----------+-------------------------+-------------------------+--------------------+----------------+----------+---------------+------------------+-----------------+-----------------------------------------------------------------------------------+</span></span><br><span class="line"><span class="operator">|</span> ID   <span class="operator">|</span> PID  <span class="operator">|</span> STATE     <span class="operator">|</span> BEGIN_TIME              <span class="operator">|</span> END_TIME                <span class="operator">|</span> SOURCE             <span class="operator">|</span> DESTINATION    <span class="operator">|</span> ERROR_NO <span class="operator">|</span> ERROR_MESSAGE <span class="operator">|</span> BINLOG_FILE      <span class="operator">|</span> BINLOG_POSITION <span class="operator">|</span> GTID_EXECUTED                                                                     <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">------+------+-----------+-------------------------+-------------------------+--------------------+----------------+----------+---------------+------------------+-----------------+-----------------------------------------------------------------------------------+</span></span><br><span class="line"><span class="operator">|</span>    <span class="number">1</span> <span class="operator">|</span>    <span class="number">0</span> <span class="operator">|</span> Completed <span class="operator">|</span> <span class="number">2023</span><span class="number">-12</span><span class="number">-25</span> <span class="number">15</span>:<span class="number">54</span>:<span class="number">53.405</span> <span class="operator">|</span> <span class="number">2023</span><span class="number">-12</span><span class="number">-25</span> <span class="number">15</span>:<span class="number">55</span>:<span class="number">01.937</span> <span class="operator">|</span> <span class="number">192.168</span><span class="number">.56</span><span class="number">.17</span>:<span class="number">3306</span> <span class="operator">|</span> <span class="keyword">LOCAL</span> INSTANCE <span class="operator">|</span>        <span class="number">0</span> <span class="operator">|</span>               <span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000004</span> <span class="operator">|</span>            <span class="number">1406</span> <span class="operator">|</span> <span class="number">0</span>ecaadea<span class="number">-9</span>fc7<span class="number">-11</span>ee<span class="number">-8099</span><span class="number">-080027128</span>c74:<span class="number">1</span>,</span><br><span class="line"><span class="number">8332185e-9</span>f15<span class="number">-11</span>ee<span class="number">-8831</span><span class="number">-080027128</span>c74:<span class="number">1</span><span class="number">-14</span> <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">------+------+-----------+-------------------------+-------------------------+--------------------+----------------+----------+---------------+------------------+-----------------+-----------------------------------------------------------------------------------+</span></span><br></pre></td></tr></table></figure>
+<p>如果失败进一步获取失败的原因<br>SELECT STATE, ERROR_NO, ERROR_MESSAGE FROM performance_schema.clone_status; </p>
+</li>
+<li><p>查看克隆进程</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">SELECT STAGE, STATE, END_TIME FROM performance_schema.clone_progress;</span><br><span class="line">root@localhost:(none)&gt;SELECT STAGE, STATE, END_TIME FROM performance_schema.clone_progress;</span><br><span class="line">+-----------+-----------+----------------------------+</span><br><span class="line">| STAGE     | STATE     | END_TIME                   |</span><br><span class="line">+-----------+-----------+----------------------------+</span><br><span class="line">| DROP DATA | Completed | 2023-12-25 15:54:54.111750 |</span><br><span class="line">| FILE COPY | Completed | 2023-12-25 15:54:56.630832 |</span><br><span class="line">| PAGE COPY | Completed | 2023-12-25 15:54:56.673880 |</span><br><span class="line">| REDO COPY | Completed | 2023-12-25 15:54:56.676687 |</span><br><span class="line">| FILE SYNC | Completed | 2023-12-25 15:54:56.817732 |</span><br><span class="line">| RESTART   | Completed | 2023-12-25 15:55:00.291296 |</span><br><span class="line">| RECOVERY  | Completed | 2023-12-25 15:55:01.937143 |</span><br><span class="line">+-----------+-----------+----------------------------+</span><br></pre></td></tr></table></figure>
+<p>7种进程状态<br>DROP DATA, FILE COPY, PAGE_COPY, REDO_COPY, FILE_SYNC, RESTART, RECOVERY.</p>
+</li>
+</ol>
+<ol>
+<li>终止克隆进程<br>SELECT * FROM performance_schema.clone_status\G<br>KILL pid</li>
+</ol>
+<h2 id="克隆的原理"><a href="#克隆的原理" class="headerlink" title="克隆的原理"></a>克隆的原理</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">                                                                   一致性的位点</span><br><span class="line">                                      |                                 |</span><br><span class="line">clone_start_lsn     clone_file_end_lsn|                        clone_lsn| </span><br><span class="line">       |                             ||                              |  |</span><br><span class="line">       [     拷贝数据文件             ]|                              |  | </span><br><span class="line">       &#123;    同时收集内存中的脏页       &#125;|     [   拷贝收集的脏页        ]  | </span><br><span class="line">                                      |     &#123;    归档redo            &#125;  |    [   拷贝redo   ]</span><br><span class="line">                                      |                                 |</span><br><span class="line">                基线                  |         增量1                    |       增量2</span><br><span class="line">---------------------------------------------------------------------------------------------&gt; </span><br><span class="line">                                                                          </span><br></pre></td></tr></table></figure>
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/plugin/" rel="tag"># plugin</a>
+              <a href="/tags/clone/" rel="tag"># clone</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2024/01/08/DBMS-CRYPTO/" rel="prev" title="ORACLE 加密解密包 DBMS_CRYPTO 的使用">
+      <i class="fa fa-chevron-left"></i> ORACLE 加密解密包 DBMS_CRYPTO 的使用
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%89%E8%A3%85"><span class="nav-number">1.</span> <span class="nav-text">安装:</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%8B%E9%9A%86%E6%95%B0%E6%8D%AE%E5%88%B0%E6%9C%AC%E5%9C%B0%E7%9B%AE%E5%BD%95"><span class="nav-number">2.</span> <span class="nav-text">克隆数据到本地目录</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%8B%E9%9A%86%E8%BF%9C%E7%AB%AF%E6%95%B0%E6%8D%AE%E5%BA%93"><span class="nav-number">3.</span> <span class="nav-text">克隆远端数据库</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%A6%81%E6%B1%82"><span class="nav-number">3.0.1.</span> <span class="nav-text">要求:</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%93%8D%E4%BD%9C%E8%BF%87%E7%A8%8B"><span class="nav-number">3.0.2.</span> <span class="nav-text">操作过程</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%85%8B%E9%9A%86%E5%B9%B6%E8%A1%8CDDL"><span class="nav-number">3.0.3.</span> <span class="nav-text">克隆并行DDL</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%85%8B%E9%9A%86%E7%94%A8%E4%BA%8E%E5%A4%8D%E5%88%B6"><span class="nav-number">3.0.4.</span> <span class="nav-text">克隆用于复制</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%85%8B%E9%9A%86%E8%BF%87%E7%A8%8B%E4%B8%AD%E4%BA%A7%E7%94%9F%E7%9A%84%E7%9B%AE%E5%BD%95"><span class="nav-number">3.0.5.</span> <span class="nav-text">克隆过程中产生的目录</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E7%9B%91%E6%8E%A7%E5%85%8B%E9%9A%86%E8%BF%87%E7%A8%8B"><span class="nav-number">3.0.6.</span> <span class="nav-text">监控克隆过程</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%8B%E9%9A%86%E7%9A%84%E5%8E%9F%E7%90%86"><span class="nav-number">4.</span> <span class="nav-text">克隆的原理</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Sheen</p>
+  <div class="site-description" itemprop="description">数据库相关技术研究,自动化运维</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">61</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">12</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">76</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2024</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Sheen</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/pjax/pjax.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[data-pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.dataset.pjax !== undefined) {
+      script.dataset.pjax = '';
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '78f8e6427a00d33b1454',
+      clientSecret: 'df55248398c379200efd40824ecae2d9fd208e20',
+      repo        : 'sheenzxx.github.io',
+      owner       : 'sheenzxx',
+      admin       : ['sheenzxx'],
+      id          : 'be61304c7db6c27891a31275b91ae5d1',
+        language: 'zh-CN',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+    </div>
+</body>
+</html>

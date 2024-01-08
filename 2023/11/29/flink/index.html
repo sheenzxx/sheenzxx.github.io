@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"sheenzxx.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"gitalk","storage":true,"lazyload":false,"nav":null,"activeClass":"gitalk"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="基本配置配置文件配置文件位于 conf&#x2F;flink-conf.xml ,采用key: value 的形式进行配置 主机名与端口只有在 standalone 应用或会话部署的情况下才需要使用在flink with yarn 或 active Kubernetes integration 模式下。主机名和端口将自动检测rest.address, rest.port 用于客户端连接flink 的地址和端">
+<meta property="og:type" content="article">
+<meta property="og:title" content="flink 配置">
+<meta property="og:url" content="https://sheenzxx.github.io/2023/11/29/flink/index.html">
+<meta property="og:site_name" content="sheen&#39;s Blog">
+<meta property="og:description" content="基本配置配置文件配置文件位于 conf&#x2F;flink-conf.xml ,采用key: value 的形式进行配置 主机名与端口只有在 standalone 应用或会话部署的情况下才需要使用在flink with yarn 或 active Kubernetes integration 模式下。主机名和端口将自动检测rest.address, rest.port 用于客户端连接flink 的地址和端">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2023-11-29T01:32:28.000Z">
+<meta property="article:modified_time" content="2023-11-30T10:17:45.404Z">
+<meta property="article:author" content="Sheen">
+<meta property="article:tag" content="flink">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://sheenzxx.github.io/2023/11/29/flink/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>flink 配置 | sheen's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="sheen's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">sheen's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">随笔，技术笔记</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/home/" rel="section"><i class="home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://sheenzxx.github.io/2023/11/29/flink/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Sheen">
+      <meta itemprop="description" content="数据库相关技术研究,自动化运维">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="sheen's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          flink 配置
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2023-11-29 09:32:28" itemprop="dateCreated datePublished" datetime="2023-11-29T09:32:28+08:00">2023-11-29</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2023-11-30 18:17:45" itemprop="dateModified" datetime="2023-11-30T18:17:45+08:00">2023-11-30</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/hadoop/" itemprop="url" rel="index"><span itemprop="name">hadoop</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="基本配置"><a href="#基本配置" class="headerlink" title="基本配置"></a>基本配置</h2><h3 id="配置文件"><a href="#配置文件" class="headerlink" title="配置文件"></a>配置文件</h3><p>配置文件位于 conf/flink-conf.xml ,采用key: value 的形式进行配置</p>
+<h3 id="主机名与端口"><a href="#主机名与端口" class="headerlink" title="主机名与端口"></a>主机名与端口</h3><p>只有在 standalone 应用或会话部署的情况下才需要使用<br>在flink with yarn 或 active Kubernetes integration 模式下。主机名和端口将自动检测<br>rest.address, rest.port 用于客户端连接flink 的地址和端口 。在 JobManager 运行的节点上，将地址设置为主机名<br>jobmanager.rpc.address (默认localhost), jobmanager.rpc.port(默认6123) 用于 TaskManager 连接 JobManager/ResourceManager。</p>
+<h3 id="内存设置"><a href="#内存设置" class="headerlink" title="内存设置"></a>内存设置</h3><p>jobmanager.memory.process.size   JobManager (JobMaster / ResourceManager / Dispatcher) 进程所用总内存的大小<br>taskmanager.memory.process.size  TaskManager 进程所用总内存大小</p>
+<p>例如可以设置为 2048m 或者 2g</p>
+<h3 id="并行设置"><a href="#并行设置" class="headerlink" title="并行设置"></a>并行设置</h3><p>taskmanager.numberOfTaskSlots    每个 TaskManager 提供的slot 数量(默认为1),每一个 slot 可以，服务一个任务或者管道<br>                                 在 TaskManager 中提供多个 slot </p>
+<p>parallelism.default              默认并行数量。当没再任何地方制定并行数量。取这个值。默认 1</p>
+<h3 id="设置检查点-checkpointing"><a href="#设置检查点-checkpointing" class="headerlink" title="设置检查点(checkpointing)"></a>设置检查点(checkpointing)</h3><p>state.backend.type               状态后端存储的类型 （filesystem 或 rocksdb）<br>state.checkpoints.dir            写 checkpoint 的路径，一般都是写在分布式存储中，例如 hdfs://namenode:port/flink/checkpoints.<br>state.savepoints.dir             写 savepoints 的路径，与 state.checkpoints.dir 设置相似<br>execution.checkpointing.interval 设置触发 checkpoint 的时间间隔，开启checkpointing 时，该值必须大于0</p>
+<h3 id="Web-UI-设置"><a href="#Web-UI-设置" class="headerlink" title="Web UI 设置"></a>Web UI 设置</h3><p>web.submit.enable                允许通过Web UI 界面上传和开始任务 默认 true<br>web.cancel.enable                允许通过Web UI 界面取消允许的任务 默认 true<br>web.upload.dir                   存储上传任务的路径 </p>
+<h3 id="其他"><a href="#其他" class="headerlink" title="其他"></a>其他</h3><p>io.tmp.dirs                      flink 存放本地数据的路径，默认为 java.io.tmpdir 指定的路径，如果配置的是一个路径列表。flink 将<br>                                 在路径之间轮换存放文件<br>                                 持久化/恢复不依赖此数据,但是如果删除这些数据，通常会导致严重的恢复操作。因此建议该目录不能存在定期清理行为</p>
+<h2 id="常用设置选项"><a href="#常用设置选项" class="headerlink" title="常用设置选项"></a>常用设置选项</h2><h3 id="为flink-不同的组件设置主机名和端口"><a href="#为flink-不同的组件设置主机名和端口" class="headerlink" title="为flink 不同的组件设置主机名和端口"></a>为flink 不同的组件设置主机名和端口</h3><p>jobmanager.rpc.address          用于设置 与 jobmanager 通讯的地址<br>jobmanager.rpc.port             用于设置 与 jobmanager 通讯的端口<br>rest.address                    用于客户端连接服务的地址,仅当 high-availability 为空时有效<br>rest.bind-address               服务绑定在服务器的地址,一般设置 0.0.0.0<br>rest.bind-port                  指定服务绑定的端口,支持端口列表<br>rest.port                       客户端连接服务的端口<br>taskmanager.host                taskmanger 的地址,不同taskmanger 地址不能相同</p>
+<h3 id="容错设置"><a href="#容错设置" class="headerlink" title="容错设置"></a>容错设置</h3><p>restart-strategy.type           指定任务失败时重启策略 none, off, disable 表示没有重启策略，如果开启checkpoint 默认为 fixed-delay 策略</p>
+<h4 id="fixed-delay-策略"><a href="#fixed-delay-策略" class="headerlink" title="fixed-delay 策略"></a>fixed-delay 策略</h4><p>restart-strategy.fixed-delay.attempts  任务声明失败前重启任务尝试的次数<br>restart-strategy.fixed-delay.delay     每次尝试重启的间隔</p>
+<h2 id="配置-TaskManager-内存"><a href="#配置-TaskManager-内存" class="headerlink" title="配置 TaskManager 内存"></a>配置 TaskManager 内存</h2><h3 id="配置总内存"><a href="#配置总内存" class="headerlink" title="配置总内存"></a>配置总内存</h3><p>Flink JVM 进程的<em>进程总内存（Total Process Memory）</em>包含了由 Flink 应用使用的内存（Flink 总内存）以及由运行 Flink 的 JVM 使用的内存。 其中，<em>Flink 总内存（Total Flink Memory）</em>包括 JVM 堆内存（Heap Memory）、<em>托管内存（Managed Memory）</em>以及其他直接内存（Direct Memory）或本地内存（Native Memory</p>
+<p>taskmanager.memory.process.size  用于配置Flink JVM 总内存的参数</p>
+<h3 id="Flink-TaskManager-内存模型的所有组成部分，以及影响其大小的相关配置参数"><a href="#Flink-TaskManager-内存模型的所有组成部分，以及影响其大小的相关配置参数" class="headerlink" title="Flink TaskManager 内存模型的所有组成部分，以及影响其大小的相关配置参数"></a>Flink TaskManager 内存模型的所有组成部分，以及影响其大小的相关配置参数</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">-----------------------------------------------------------------------------------------------------------------------------------------</span><br><span class="line">|            组成部分                        |      配置参数                               |              描述                            |</span><br><span class="line">-----------------------------------------------------------------------------------------------------------------------------------------      </span><br><span class="line">| 框架堆内存(Framework Heap Memory)          | taskmanager.memory.framework.heap.size      |   用于 Flink 框架的 JVM 堆内存(进阶配置)      |</span><br><span class="line">-----------------------------------------------------------------------------------------------------------------------------------------</span><br><span class="line">|任务堆内存(Task Heap Memory)                | taskmanager.memory.task.heap.size           |   用于 Flink 应用的算子及用户代码的 JVM 堆内存.|</span><br><span class="line">-----------------------------------------------------------------------------------------------------------------------------------------</span><br><span class="line">|托管内存(Managed memory)                    | taskmanager.memory.managed.size             |   由 Flink 管理的用于排序、哈希表、缓存中间结果及|</span><br><span class="line">|                                           | taskmanager.memory.managed.fraction         |   RocksDB State Backend 的本地内存.            |</span><br><span class="line">-----------------------------------------------------------------------------------------------------------------------------------------      </span><br><span class="line">|框架堆外内存(Framework Off-heap Memory)     | taskmanager.memory.framework.off-heap.size  |   用于 Flink 框架的堆外内存（直接内存或本地内存）|</span><br><span class="line">|                                           |                                             |   (进阶配置)                                  | </span><br><span class="line">------------------------------------------------------------------------------------------------------------------------------------------</span><br><span class="line">|任务堆外内存(Task Off-heap Memory)          | taskmanager.memory.task.off-heap.size       |   用于 Flink 应用的算子及用户代码的堆外内存      |</span><br><span class="line">|                                           |                                             |   （直接内存或本地内存）。                      |</span><br><span class="line">------------------------------------------------------------------------------------------------------------------------------------------</span><br><span class="line">|网络内存(Network Memory)                    | taskmanager.memory.network.min              |用于任务之间数据传输的直接内存（例如网络传输缓冲） |</span><br><span class="line">|                                           | taskmanager.memory.network.max              |该内存部分为基于 Flink 总内存的受限的等比内存部分 |</span><br><span class="line">|                                           | taskmanager.memory.network.fraction         |这块内存被用于分配网络缓冲                       |</span><br><span class="line">-------------------------------------------------------------------------------------------------------------------------------------------</span><br><span class="line">|JVM Metaspace                              | taskmanager.memory.jvm-metaspace.size       |  Flink JVM 进程的 Metaspace。                 |</span><br><span class="line">-------------------------------------------------------------------------------------------------------------------------------------------</span><br><span class="line">|JVM 开销                                   | taskmanager.memory.jvm-overhead.min          | 用于其他 JVM 开销的本地内存，                  |</span><br><span class="line">|                                           | taskmanager.memory.jvm-overhead.max          | 例如栈空间、垃圾回收空间等。                   |</span><br><span class="line">|                                           | taskmanager.memory.jvm-overhead.fraction     | 该内存部分为基于进程总内存的受限的等比内存部分。 |</span><br><span class="line">-------------------------------------------------------------------------------------------------------------------------------------------</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>通常情况下,不建议对框架堆内存，和框架外堆内存进行调整</p>
+<p>如果 Flink 作为一个单独的 Java 程序运行在你的电脑本地而非创建一个集群，只有以下参数会生效<br>taskmanager.memory.task.heap.size      默认无穷大<br>taskmanager.memory.task.off-heap.size  默认无穷大<br>taskmanager.memory.managed.size        默认128M<br>taskmanager.memory.network.min         默认64M<br>taskmanager.memory.network.max</p>
+<h3 id=""><a href="#" class="headerlink" title=" "></a> </h3>
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/flink/" rel="tag"># flink</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/11/24/requestproxy/" rel="prev" title="python 使用代理访问">
+      <i class="fa fa-chevron-left"></i> python 使用代理访问
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/12/22/mysql8grm/" rel="next" title="mysql8.2搭建单主模式组复制及相关知识">
+      mysql8.2搭建单主模式组复制及相关知识 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9F%BA%E6%9C%AC%E9%85%8D%E7%BD%AE"><span class="nav-number">1.</span> <span class="nav-text">基本配置</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6"><span class="nav-number">1.1.</span> <span class="nav-text">配置文件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%BB%E6%9C%BA%E5%90%8D%E4%B8%8E%E7%AB%AF%E5%8F%A3"><span class="nav-number">1.2.</span> <span class="nav-text">主机名与端口</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%85%E5%AD%98%E8%AE%BE%E7%BD%AE"><span class="nav-number">1.3.</span> <span class="nav-text">内存设置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B9%B6%E8%A1%8C%E8%AE%BE%E7%BD%AE"><span class="nav-number">1.4.</span> <span class="nav-text">并行设置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%BE%E7%BD%AE%E6%A3%80%E6%9F%A5%E7%82%B9-checkpointing"><span class="nav-number">1.5.</span> <span class="nav-text">设置检查点(checkpointing)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Web-UI-%E8%AE%BE%E7%BD%AE"><span class="nav-number">1.6.</span> <span class="nav-text">Web UI 设置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%B6%E4%BB%96"><span class="nav-number">1.7.</span> <span class="nav-text">其他</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B8%B8%E7%94%A8%E8%AE%BE%E7%BD%AE%E9%80%89%E9%A1%B9"><span class="nav-number">2.</span> <span class="nav-text">常用设置选项</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%BAflink-%E4%B8%8D%E5%90%8C%E7%9A%84%E7%BB%84%E4%BB%B6%E8%AE%BE%E7%BD%AE%E4%B8%BB%E6%9C%BA%E5%90%8D%E5%92%8C%E7%AB%AF%E5%8F%A3"><span class="nav-number">2.1.</span> <span class="nav-text">为flink 不同的组件设置主机名和端口</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%B9%E9%94%99%E8%AE%BE%E7%BD%AE"><span class="nav-number">2.2.</span> <span class="nav-text">容错设置</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#fixed-delay-%E7%AD%96%E7%95%A5"><span class="nav-number">2.2.1.</span> <span class="nav-text">fixed-delay 策略</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE-TaskManager-%E5%86%85%E5%AD%98"><span class="nav-number">3.</span> <span class="nav-text">配置 TaskManager 内存</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E6%80%BB%E5%86%85%E5%AD%98"><span class="nav-number">3.1.</span> <span class="nav-text">配置总内存</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Flink-TaskManager-%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B%E7%9A%84%E6%89%80%E6%9C%89%E7%BB%84%E6%88%90%E9%83%A8%E5%88%86%EF%BC%8C%E4%BB%A5%E5%8F%8A%E5%BD%B1%E5%93%8D%E5%85%B6%E5%A4%A7%E5%B0%8F%E7%9A%84%E7%9B%B8%E5%85%B3%E9%85%8D%E7%BD%AE%E5%8F%82%E6%95%B0"><span class="nav-number">3.2.</span> <span class="nav-text">Flink TaskManager 内存模型的所有组成部分，以及影响其大小的相关配置参数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link"><span class="nav-number">3.3.</span> <span class="nav-text"> </span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Sheen</p>
+  <div class="site-description" itemprop="description">数据库相关技术研究,自动化运维</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">61</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">12</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">76</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2024</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Sheen</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/pjax/pjax.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[data-pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.dataset.pjax !== undefined) {
+      script.dataset.pjax = '';
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '78f8e6427a00d33b1454',
+      clientSecret: 'df55248398c379200efd40824ecae2d9fd208e20',
+      repo        : 'sheenzxx.github.io',
+      owner       : 'sheenzxx',
+      admin       : ['sheenzxx'],
+      id          : '0c4e8620623f582630230d4b31422879',
+        language: 'zh-CN',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+    </div>
+</body>
+</html>
